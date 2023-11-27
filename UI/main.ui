@@ -1,0 +1,503 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ui version="4.0">
+ <class>Dialog</class>
+ <widget class="QDialog" name="Dialog">
+  <property name="geometry">
+   <rect>
+    <x>0</x>
+    <y>0</y>
+    <width>471</width>
+    <height>1000</height>
+   </rect>
+  </property>
+  <property name="sizePolicy">
+   <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+    <horstretch>0</horstretch>
+    <verstretch>0</verstretch>
+   </sizepolicy>
+  </property>
+  <property name="maximumSize">
+   <size>
+    <width>600</width>
+    <height>1000</height>
+   </size>
+  </property>
+  <property name="windowTitle">
+   <string>Диспетчер автоматической отправки Outlook</string>
+  </property>
+  <layout class="QGridLayout" name="gridLayout">
+   <item row="6" column="0" colspan="3">
+    <widget class="QGroupBox" name="groupBox_4">
+     <property name="title">
+      <string>Режим работы</string>
+     </property>
+     <layout class="QGridLayout" name="gridLayout_4">
+      <item row="0" column="0" colspan="2">
+       <widget class="QRadioButton" name="radioButton_periodic">
+        <property name="toolTip">
+         <string>Режим отправки через заданный промежуток времени</string>
+        </property>
+        <property name="text">
+         <string>Периодический режим, отправлять каждые:</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="2">
+       <widget class="QTimeEdit" name="timeEdit_send_period">
+        <property name="minimumTime">
+         <time>
+          <hour>0</hour>
+          <minute>1</minute>
+          <second>0</second>
+         </time>
+        </property>
+        <property name="displayFormat">
+         <string>H часов mm минут</string>
+        </property>
+        <property name="time">
+         <time>
+          <hour>1</hour>
+          <minute>0</minute>
+          <second>0</second>
+         </time>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="2">
+       <widget class="QLineEdit" name="lineEdit_schedule">
+        <property name="placeholderText">
+         <string>13:10,17:20</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0" colspan="2">
+       <widget class="QRadioButton" name="radioButton_schedule">
+        <property name="toolTip">
+         <string>Режим отправки в указанное время</string>
+        </property>
+        <property name="text">
+         <string>Режим расписания (ЧЧ:ММ через &quot;,&quot;)</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item row="4" column="0" colspan="3">
+    <widget class="QGroupBox" name="groupBox_2">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
+     <property name="title">
+      <string>Параметры отправки</string>
+     </property>
+     <layout class="QGridLayout" name="gridLayout_2">
+      <item row="2" column="1" colspan="2">
+       <widget class="QPlainTextEdit" name="plainTextEdit_body"/>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="label_3">
+        <property name="text">
+         <string>Тема письма:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="3" column="0" colspan="2">
+       <widget class="QLabel" name="label_8">
+        <property name="toolTip">
+         <string>Когда суммарный вес документов достигает этого значения, письмо отправляется,
+оставшиеся документы начинают формировать новое письмо.</string>
+        </property>
+        <property name="text">
+         <string>Предельный суммарный вес вложений в одном письме, мб:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="3" column="2">
+       <widget class="QSpinBox" name="spinBox_max_attach_weight">
+        <property name="minimum">
+         <number>1</number>
+        </property>
+        <property name="value">
+         <number>10</number>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="1" colspan="2">
+       <widget class="QLineEdit" name="lineEdit_recipients">
+        <property name="toolTip">
+         <string>Например: &quot;ivan123@ya.ru;stas@mail.ru;sud@sudf.ru&quot;</string>
+        </property>
+        <property name="placeholderText">
+         <string>ivan123@ya.ru;stas@mail.ru;sud@sudf.ru</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="0">
+       <widget class="QLabel" name="label_2">
+        <property name="toolTip">
+         <string>Например: &quot;ivan123@ya.ru;stas@mail.ru;sud@sudf.ru&quot;</string>
+        </property>
+        <property name="text">
+         <string>Адреса доставки через &quot;;&quot;</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="1" colspan="2">
+       <widget class="QLineEdit" name="lineEdit_subject"/>
+      </item>
+      <item row="2" column="0">
+       <widget class="QLabel" name="label_4">
+        <property name="text">
+         <string>Тело письма:</string>
+        </property>
+        <property name="alignment">
+         <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item row="10" column="0" colspan="3">
+    <widget class="QPlainTextEdit" name="plainTextEdit_log">
+     <property name="undoRedoEnabled">
+      <bool>false</bool>
+     </property>
+     <property name="readOnly">
+      <bool>true</bool>
+     </property>
+     <property name="plainText">
+      <string>Здесь будет отображаться лог работы приложения!</string>
+     </property>
+    </widget>
+   </item>
+   <item row="7" column="0" colspan="3">
+    <widget class="QGroupBox" name="groupBox_5">
+     <property name="title">
+      <string>Запуск программы</string>
+     </property>
+     <layout class="QGridLayout" name="gridLayout_5">
+      <item row="2" column="0">
+       <widget class="QLabel" name="label_7">
+        <property name="toolTip">
+         <string>Дать время на запуск других программ</string>
+        </property>
+        <property name="text">
+         <string>Задержка подключения к Outlook при запуске:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="0" colspan="2">
+       <widget class="QCheckBox" name="checkBox_autorun">
+        <property name="toolTip">
+         <string>В папке автозагрузки создается ярлык на запуск программы</string>
+        </property>
+        <property name="text">
+         <string>Добавить в автозапуск Windows</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="1">
+       <widget class="QTimeEdit" name="timeEdit_connecting_delay">
+        <property name="toolTip">
+         <string>Дать время на запуск других программ</string>
+        </property>
+        <property name="currentSection">
+         <enum>QDateTimeEdit::MinuteSection</enum>
+        </property>
+        <property name="displayFormat">
+         <string>mm минут ss секунд</string>
+        </property>
+        <property name="time">
+         <time>
+          <hour>0</hour>
+          <minute>0</minute>
+          <second>30</second>
+         </time>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0" colspan="2">
+       <widget class="QCheckBox" name="checkBox_autostart">
+        <property name="toolTip">
+         <string>При автозапуске будет запущена работа в выбранном режиме</string>
+        </property>
+        <property name="text">
+         <string>Запускать работу в заданном режиме при автозапуске</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item row="11" column="2">
+    <widget class="QPushButton" name="pushButton_log">
+     <property name="text">
+      <string>Открыть лог</string>
+     </property>
+    </widget>
+   </item>
+   <item row="9" column="0" colspan="3">
+    <widget class="QPushButton" name="pushButton_start_stop_workers">
+     <property name="toolTip">
+      <string>Запустить работу программы в выбранном режиме сейчас</string>
+     </property>
+     <property name="text">
+      <string>Запустить работу в выбранном режиме</string>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="0" colspan="3">
+    <widget class="QGroupBox" name="groupBox_3">
+     <property name="title">
+      <string>Директории</string>
+     </property>
+     <layout class="QGridLayout" name="gridLayout_3">
+      <item row="1" column="1">
+       <widget class="QLineEdit" name="lineEdit_get_path">
+        <property name="maximumSize">
+         <size>
+          <width>313</width>
+          <height>16777215</height>
+         </size>
+        </property>
+        <property name="toolTip">
+         <string>Место, где программа ищет документы на отправку</string>
+        </property>
+       </widget>
+      </item>
+      <item row="3" column="0" colspan="2">
+       <widget class="QCheckBox" name="checkBox_archive_files">
+        <property name="toolTip">
+         <string>Собирать все подходящие для отправки файлы в один архив</string>
+        </property>
+        <property name="text">
+         <string>Собирать файлы к отправке в один архив</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="2">
+       <widget class="QToolButton" name="toolButton_lineEdit_get_path">
+        <property name="text">
+         <string>...</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="2">
+       <widget class="QToolButton" name="toolButton_lineEdit_put_path">
+        <property name="text">
+         <string>...</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="label_5">
+        <property name="acceptDrops">
+         <bool>false</bool>
+        </property>
+        <property name="toolTip">
+         <string>Место, где программа ищет документы на отправку</string>
+        </property>
+        <property name="text">
+         <string>Откуда брать</string>
+        </property>
+       </widget>
+      </item>
+      <item row="5" column="0" colspan="2">
+       <widget class="QCheckBox" name="checkBox_with_sig_only">
+        <property name="toolTip">
+         <string>Если у файла нет парного файла с .sig на конце, такие файлы будут инорироваться</string>
+        </property>
+        <property name="text">
+         <string>Отправлять только если есть парный .sig файл</string>
+        </property>
+        <property name="checkable">
+         <bool>true</bool>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="0">
+       <widget class="QLabel" name="label_6">
+        <property name="toolTip">
+         <string>Место, куда программа складывает отправленне файлы/архивы</string>
+        </property>
+        <property name="text">
+         <string>Куда класть</string>
+        </property>
+       </widget>
+      </item>
+      <item row="2" column="1">
+       <widget class="QLineEdit" name="lineEdit_put_path">
+        <property name="maximumSize">
+         <size>
+          <width>313</width>
+          <height>16777215</height>
+         </size>
+        </property>
+        <property name="toolTip">
+         <string>Место, куда программа складывает отправленне файлы/архивы</string>
+        </property>
+       </widget>
+      </item>
+      <item row="4" column="0">
+       <widget class="QLabel" name="label_10">
+        <property name="text">
+         <string>Название архива: </string>
+        </property>
+       </widget>
+      </item>
+      <item row="4" column="1" colspan="2">
+       <widget class="QLineEdit" name="lineEdit_archname">
+        <property name="text">
+         <string/>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item row="3" column="0" colspan="3">
+    <widget class="QGroupBox" name="groupBox_encrypt_attachments">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
+     <property name="toolTip">
+      <string>Непосредственно перед отправкой файл/ы можно зашифровать на основе 
+выбранного сертификата из хранилища личных сертификатов пользователя</string>
+     </property>
+     <property name="title">
+      <string>Шифрование (Небходим криптопровайдер КРИПТО ПРО)</string>
+     </property>
+     <property name="checkable">
+      <bool>false</bool>
+     </property>
+     <layout class="QGridLayout" name="gridLayout_6">
+      <item row="1" column="1">
+       <widget class="QLineEdit" name="lineEdit_csp_path">
+        <property name="maximumSize">
+         <size>
+          <width>282</width>
+          <height>16777215</height>
+         </size>
+        </property>
+        <property name="toolTip">
+         <string>Укажите папку, где находится файл csptest.exe 
+(Место установки КРИПТО ПРО, по умолчанию C:\Program Files\Crypto Pro\CSP)</string>
+        </property>
+        <property name="placeholderText">
+         <string>C:\Program Files\Crypto Pro\CSP</string>
+        </property>
+       </widget>
+      </item>
+      <item row="3" column="0" colspan="3">
+       <widget class="QComboBox" name="comboBox_certs">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>450</width>
+          <height>16777215</height>
+         </size>
+        </property>
+        <property name="toolTip">
+         <string>Сертификаты из хранилища Личные</string>
+        </property>
+        <item>
+         <property name="text">
+          <string>Сертификат не выбран</string>
+         </property>
+        </item>
+       </widget>
+      </item>
+      <item row="1" column="0">
+       <widget class="QLabel" name="label">
+        <property name="toolTip">
+         <string>Укажите папку, где находится файл csptest.exe 
+(Место установки КРИПТО ПРО, по умолчанию C:\Program Files\Crypto Pro\CSP)</string>
+        </property>
+        <property name="text">
+         <string>Папка с csptest.exe:</string>
+        </property>
+       </widget>
+      </item>
+      <item row="1" column="2">
+       <widget class="QToolButton" name="toolButton_lineEdit_csp_path">
+        <property name="text">
+         <string>...</string>
+        </property>
+       </widget>
+      </item>
+      <item row="0" column="0" colspan="3">
+       <widget class="QCheckBox" name="checkBox_use_encryption">
+        <property name="text">
+         <string>Шифровать файлы сертификатом</string>
+        </property>
+        <property name="checked">
+         <bool>true</bool>
+        </property>
+       </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item row="11" column="0">
+    <widget class="QLabel" name="label_9">
+     <property name="text">
+      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Разработка &lt;a href=&quot;https://boosty.to/microrazrab&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0000ff;&quot;&gt;DmirtySosnin&lt;/span&gt;&lt;/a&gt;, иконка от &lt;a href=&quot;https://icons8.ru/&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0000ff;&quot;&gt;icons8&lt;/span&gt;&lt;/a&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+     </property>
+     <property name="textFormat">
+      <enum>Qt::RichText</enum>
+     </property>
+     <property name="openExternalLinks">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item row="8" column="0" colspan="3">
+    <widget class="QPushButton" name="pushButton_create_mail_now">
+     <property name="toolTip">
+      <string>Сформировать письмо/а для отправки и отобразить их.</string>
+     </property>
+     <property name="text">
+      <string>Отправить вручную сейчас</string>
+     </property>
+    </widget>
+   </item>
+   <item row="11" column="1">
+    <spacer name="horizontalSpacer">
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>40</width>
+       <height>20</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+  </layout>
+ </widget>
+ <resources/>
+ <connections/>
+</ui>
