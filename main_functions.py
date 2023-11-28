@@ -22,6 +22,11 @@ from datetime import datetime
 # except Exception as e:
 #     print(f"Ошибка установки кодовой страницы: {e}")
 config_path = os.path.dirname(sys.argv[0])
+temp_path = os.path.join(config_path, 'temp')
+if os.path.isdir(temp_path):
+    shutil.rmtree(temp_path)
+else:
+    os.mkdir(temp_path)
 if not os.path.exists(config_path):
     os.mkdir(config_path)
 config_file = os.path.join(config_path, 'config.json')
@@ -203,7 +208,10 @@ def send_mail(attachments, manual=True):
         if config['checkBox_use_encryption']:
             orig_att = att
             att = encode_file(att)
-        attachment = message.Attachments.Add(os.path.normpath(att))
+        temp_filepath = os.path.join(temp_path, os.path.basename(att))
+        shutil.copy(att, temp_filepath)
+        attachment = message.Attachments.Add(temp_filepath)
+        os.unlink(temp_filepath)
         shutil.move(orig_att, config['lineEdit_put_path'])
         if config['checkBox_use_encryption']:
             os.unlink(att)

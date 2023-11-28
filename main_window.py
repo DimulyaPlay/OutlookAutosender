@@ -87,7 +87,9 @@ class MainWindow(QDialog):
         self.start_manual.clicked.connect(lambda: self.send_mail_manual(True))
         self.plainTextEdit_log = self.findChild(QPlainTextEdit, 'plainTextEdit_log')
         pushButton_log = self.findChild(QPushButton, 'pushButton_log')
-        pushButton_log.clicked.connect(lambda: os.startfile(config_path))
+        pushButton_log.clicked.connect(lambda: os.startfile(os.path.join(config_path, 'log.log')))
+        pushButton_help = self.findChild(QPushButton, 'pushButton_help')
+        pushButton_help.clicked.connect(lambda: os.startfile(os.path.join(config_path, 'readme.txt')))
         autorun = self.findChild(QCheckBox, 'checkBox_autorun')
         autorun.clicked.connect(add_to_startup)
         if config['checkBox_autorun'] and config['checkBox_autostart']:
@@ -126,7 +128,7 @@ class MainWindow(QDialog):
         save_config(self.config)
 
     def send_mail_manual(self, manual):
-        errors = self.check_fields()
+        errors = self.check_fields(manual)
         if errors:
             self.add_log_message('\n'.join(errors))
             return
@@ -142,10 +144,12 @@ class MainWindow(QDialog):
                     sent_file_names = ',\n'.join([os.path.basename(fp) for fp in filenames])
                     self.add_log_message(f'В архиве {sent_files} содержатся:\n{sent_file_names}')
             except Exception as e:
-                traceback.print_exc()
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                traceback_str = ''.join(traceback.format_exception(exc_type, exc_value, exc_traceback))
                 sent_files = ', '.join([os.path.basename(fp) for fp in message_attachments])
                 self.add_log_message(f'ОШИБКА отправки файлов: {message_attachments}')
-                self.add_log_message(e)
+                self.add_log_message(traceback_str)
+                traceback.print_exc()
 
     def switch_tasker(self):
         errors = self.check_fields()
@@ -230,7 +234,7 @@ class MainWindow(QDialog):
         with open(log_path, "a") as log_file:
             log_file.write(log_entry + "\n")
 
-    def check_fields(self):
+    def check_fields(self, manual=False):
         errors = []
         if not os.path.isdir(self.config['lineEdit_get_path']):
             errors.append('Некорректный путь для исходящих')
@@ -251,7 +255,7 @@ class MainWindow(QDialog):
                 errors.append('Не обнаружен валидный email адрес')
         else:
             errors.append('Должен быть указан хотя бы один адресат')
-        if self.config['radioButton_schedule']:
+        if self.config['radioButton_schedule'] and not manual:
             valid = True
             periods = self.config['lineEdit_schedule'].split(',')
             for period in periods:
