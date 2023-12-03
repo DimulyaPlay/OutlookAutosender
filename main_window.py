@@ -1,7 +1,7 @@
 import sys
 import os
 import traceback
-from PyQt5.QtWidgets import QDialog, QLabel, QLineEdit, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget, \
+from PyQt5.QtWidgets import QMainWindow, QLabel, QLineEdit, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget, \
     QCheckBox, QRadioButton, QGroupBox, QComboBox, QPlainTextEdit, QSpinBox, QTimeEdit, QToolButton, QFileDialog,\
     QPushButton, QApplication, QSystemTrayIcon, QAction, QMenu
 from PyQt5.QtGui import QIcon
@@ -13,25 +13,24 @@ from threading import Thread, Lock
 from main_functions import save_config, get_cert_names, gather_mail, send_mail, validate_email, check_time, add_to_startup, config_path
 
 
-class MainWindow(QDialog):
+class MainWindow(QMainWindow):
     def __init__(self, config):
         super().__init__()
-        ui_file = 'UI/main.ui'
+        ui_file = 'UI/main_2.ui'
         uic.loadUi(ui_file, self)
         icon = QIcon("UI/icons8-carrier-pigeon-64.png")
-
+        self.setWindowFlags(self.windowFlags() & ~Qt.WindowMaximizeButtonHint)
+        self.setWindowIcon(icon)
         def tray_activated(reason):
             if reason == QSystemTrayIcon.DoubleClick:
-                self.show()
-
-        self.setWindowFlags(Qt.Tool)
+                self.show_window()
         self.tray = QSystemTrayIcon(self)
         self.tray.setIcon(icon)
         self.tray.setVisible(True)
         show_action = QAction("Показать", self)
         quit_action = QAction("Выйти", self)
         hide_action = QAction("Скрыть", self)
-        show_action.triggered.connect(self.show)
+        show_action.triggered.connect(self.show_window)
         hide_action.triggered.connect(self.hide)
         quit_action.triggered.connect(lambda: sys.exit(0))
         tray_menu = QMenu()
@@ -101,6 +100,18 @@ class MainWindow(QDialog):
             self.autostart_timer.start(secs * 1000)
         else:
             self.show()
+
+    def hideEvent(self, event):
+        event.ignore()
+        self.hide_to_tray()
+
+    def hide_to_tray(self):
+        self.hide()
+        self.tray.showMessage("Приложение свернуто", "Приложение свернуто в трей", QSystemTrayIcon.Information)
+
+    def show_window(self):
+        self.showNormal()  # Показываем окно в обычном состоянии (не минимизированном)
+        self.activateWindow()
 
     def set_user_dir(self, lineeditname):
         options = QFileDialog.Options()
