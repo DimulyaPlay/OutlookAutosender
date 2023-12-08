@@ -14,17 +14,12 @@ import winshell
 import sys
 from datetime import datetime
 
-# try:
-#     # Изменяем кодовую страницу окружения на UTF-8
-#     kernel32 = ctypes.windll.kernel32
-#     kernel32.SetConsoleCP(65001)
-#     kernel32.SetConsoleOutputCP(65001)
-# except Exception as e:
-#     print(f"Ошибка установки кодовой страницы: {e}")
+
 config_path = os.path.dirname(sys.argv[0])
 temp_path = os.path.join(config_path, 'temp')
 if os.path.isdir(temp_path):
     shutil.rmtree(temp_path)
+    os.mkdir(temp_path)
 else:
     os.mkdir(temp_path)
 if not os.path.exists(config_path):

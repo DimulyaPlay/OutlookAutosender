@@ -105,6 +105,9 @@ class MainWindow(QMainWindow):
         event.ignore()
         self.hide_to_tray()
 
+    def closeEvent(self, event):
+        sys.exit(0)
+
     def hide_to_tray(self):
         self.hide()
         self.tray.showMessage("Приложение свернуто", "Приложение свернуто в трей", QSystemTrayIcon.Information)
@@ -144,8 +147,6 @@ class MainWindow(QMainWindow):
             self.add_log_message('\n'.join(errors))
             return
         messages, names = gather_mail()
-        if not messages:
-            self.add_log_message(f'Файлов для отправки не обнаружено')
         for message_attachments, filenames in zip(messages, names):
             try:
                 send_mail(message_attachments, manual=manual)
@@ -163,6 +164,8 @@ class MainWindow(QMainWindow):
                 traceback.print_exc()
 
     def switch_tasker(self):
+        if self.autostart_timer.isActive():
+            self.autostart_timer.stop()
         errors = self.check_fields()
         if errors:
             self.add_log_message('\n'.join(errors))
@@ -211,7 +214,7 @@ class MainWindow(QMainWindow):
             self.timer.start()
             self.daemon_running = True
             self.start_scheduler.setText('Остановить работу')
-            self.add_log_message('Задача запускается в заданные временные точки')
+            self.add_log_message('Задача запустится в заданные временные точки')
         else:
             self.daemon_running = False
             self.timer.stop()
@@ -223,12 +226,12 @@ class MainWindow(QMainWindow):
             self.timer = QTimer(self)
             self.timer.timeout.connect(lambda: self.send_mail_manual(False))
             hours, minutes = self.timeEdit_send_period.time().toString('HH:mm').split(':')
-            total_seconds = int(hours) * 3600 + int(minutes) * 60 * 1000
+            total_seconds = (int(hours) * 3600 + int(minutes) * 60) * 1000
             self.timer_interval = total_seconds
             self.timer.setInterval(self.timer_interval)
             self.daemon_running = True
             self.send_mail_manual(False)
-            self.add_log_message('Задача запускается')
+            self.add_log_message('Задача запущена')
             self.timer.start()
             self.start_scheduler.setText('Остановить работу')
         else:
