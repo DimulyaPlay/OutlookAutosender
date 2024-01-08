@@ -13,6 +13,13 @@ import ctypes
 import winshell
 import sys
 from datetime import datetime
+from PyQt5.QtWidgets import QDialog, QLineEdit, QCheckBox
+from PyQt5 import uic
+from PyQt5.QtGui import QIcon
+import winreg
+import win32print
+from zipfile import ZipFile
+import random
 
 
 config_path = os.path.dirname(sys.argv[0])
@@ -49,7 +56,11 @@ def read_create_config(config_file):
         'lineEdit_schedule': '13:10,17:20',
         'checkBox_autorun': False,
         'checkBox_autostart': False,
-        'timeEdit_connecting_delay': '0:00:30'
+        'timeEdit_connecting_delay': '0:00:30',
+        'checkbox_use_edo': False,
+        'lineedit_input_edo': '',
+        'lineedit_output_edo': '',
+        'lineedit_rr_address': ''
     }
     if os.path.exists(config_file):
         try:
@@ -104,10 +115,8 @@ def is_file_locked(filepath):
         file_handle = open(filepath, 'a')
         msvcrt.locking(file_handle.fileno(), msvcrt.LK_NBLCK, 1)
         return True
-    except IOError:
+    except:
         return False
-    finally:
-        file_handle.close()
 
 
 def split_files_into_groups(file_paths):
@@ -184,6 +193,85 @@ def gather_mail():
     if config['checkBox_archive_files']:
         groups_for_send, groups_filenames = archive_groups(groups_for_send)
     return groups_for_send, groups_filenames
+
+
+def agregate_edo_messages():
+    print('starting_messages')
+    outlook = win32com.client.Dispatch('Outlook.Application')
+    namespace = outlook.GetNamespace('MAPI')
+    current_filelist = glob(config['lineedit_input_edo'] + '/*')
+    current_filelist = [fp for fp in current_filelist if
+                        os.path.isfile(fp) and fp.endswith('.zip') and is_file_locked(fp)]
+    for archive in current_filelist:
+        foldername_extracted = archive[:-4]
+        if os.path.exists(foldername_extracted):
+            foldername_extracted = foldername_extracted + str(random.randint(1, 9999))
+        with ZipFile(archive, 'r') as zipObj:
+            zipObj.extractall(foldername_extracted)
+        with open(foldername_extracted+'\\meta.json', 'r') as metafile:
+            meta = json.load(metafile)
+        print(meta)
+        if meta['rr']:
+            att_enc = encode_file(archive)
+            message = outlook.CreateItem(0)
+            message.Subject = meta['subject']
+            message.Body = meta['body']
+            message.Attachments.Add(att_enc)
+            recipient = message.Recipients.Add(config.get('lineedit_rr_address', 'no_addres'))
+            recipient.Type = 1
+            sender = namespace.CreateRecipient(namespace.CurrentUser.Address)
+            sender.Resolve()
+            message.SendUsingAccount = sender
+            message.Send()
+        if meta['emails']:
+            message = outlook.CreateItem(0)
+            message.Subject = meta['subject']
+            message.Body = meta['body']
+            attachments = [os.path.join(foldername_extracted, fileName) for fileName in meta['fileNames']]
+            for att in attachments:
+                orig_att = att
+                temp_filepath = os.path.join(temp_path, os.path.basename(att))
+                shutil.copy(att, temp_filepath)
+                attachment = message.Attachments.Add(temp_filepath)
+                os.unlink(temp_filepath)
+                if config['checkBox_use_encryption']:
+                    os.unlink(att)
+            recipients = meta['emails'].split(';')
+            for r in recipients:
+                if validate_email(r):
+                    recipient = message.Recipients.Add(r)
+                    recipient.Type = 1
+            sender = namespace.CreateRecipient(namespace.CurrentUser.Address)
+            sender.Resolve()
+            message.SendUsingAccount = sender
+            message.Send()
+            sent_folder = namespace.GetDefaultFolder(5)
+            sorted_items = sorted(sent_folder.Items, key=lambda x: x.CreationTime, reverse=True)
+            sent_message = None
+            timeout = time.time() + 30  # Ждем не более 30 секунд
+            while not sent_message and time.time() < timeout:
+                sent_folder = namespace.GetDefaultFolder(5)
+                sorted_items = sorted(sent_folder.Items, key=lambda x: x.CreationTime, reverse=True)
+                for item in sorted_items[:5]:
+                    if item.Subject == meta['subject']:
+                        sent_message = item
+                        break
+                time.sleep(1)
+            printer_name = 'PDF24EDO'
+            default_printer = win32print.GetDefaultPrinter()
+            if default_printer != printer_name:
+                win32print.SetDefaultPrinter(printer_name)
+            sent_message.PrintOut()
+            win32print.SetDefaultPrinter(default_printer)
+            report_found = False
+            pdf_report = os.path.join(config['lineedit_output_edo'], f'reports\\{meta["id"]}.pdf')
+            while not report_found:
+                flist = glob(config['lineedit_output_edo'] + '\\' + '*.pdf')
+                for f in flist:
+                    if is_file_locked(f):
+                        shutil.move(f, pdf_report)
+                        report_found = True
+        shutil.move(archive, os.path.join(config['lineedit_output_edo'], 'reports'))
 
 
 def send_mail(attachments, manual=True):
@@ -267,3 +355,32 @@ def create_shortcut(shortcut_path):
     shortcut.TargetPath = sys.argv[0]
     shortcut.WorkingDirectory = os.path.dirname(sys.argv[0])
     shortcut.save()
+
+
+class EdoWindow(QDialog):
+    def __init__(self, config):
+        super().__init__()
+        ui_file = 'UI/edo.ui'
+        uic.loadUi(ui_file, self)
+        icon = QIcon("UI/icons8-carrier-pigeon-64.png")
+        self.setWindowIcon(icon)
+        self.config = config
+        self.checkBox_use_edo = self.findChild(QCheckBox, 'checkbox_use_edo')
+        self.checkBox_use_edo.setChecked(self.config.get('checkbox_use_edo', False))
+        self.checkBox_use_edo.clicked.connect(lambda: self.save_params('checkbox_use_edo'))
+        self.lineEdit_input_edo = self.findChild(QLineEdit, 'lineedit_input_edo')
+        self.lineEdit_input_edo.setText(self.config.get('lineedit_input_edo', ''))
+        self.lineEdit_input_edo.textChanged.connect(lambda: self.save_params('lineedit_input_edo'))
+        self.lineEdit_output_edo = self.findChild(QLineEdit, 'lineedit_output_edo')
+        self.lineEdit_output_edo.setText(self.config.get('lineedit_output_edo', ''))
+        self.lineEdit_output_edo.textChanged.connect(lambda: self.save_params('lineedit_output_edo'))
+        self.lineEdit_rr_address = self.findChild(QLineEdit, 'lineedit_rr_address')
+        self.lineEdit_rr_address.setText(self.config.get('lineedit_rr_address', ''))
+        self.lineEdit_rr_address.textChanged.connect(lambda: self.save_params('lineedit_rr_address'))
+
+    def save_params(self, lineEdit_name):
+        lineEdit = self.findChild(QLineEdit, lineEdit_name)
+        if lineEdit:
+            self.config[lineEdit_name] = lineEdit.text()
+        checkBox = self.findChild(QCheckBox, 'checkbox_use_edo')
+        self.config['checkbox_use_edo'] = checkBox.isChecked()

@@ -572,9 +572,9 @@
      </spacer>
     </item>
     <item row="7" column="2">
-     <widget class="QPushButton" name="pushButton_help">
+     <widget class="QPushButton" name="pushButton_edo">
       <property name="text">
-       <string>Помощь</string>
+       <string>ЭДО</string>
       </property>
      </widget>
     </item>

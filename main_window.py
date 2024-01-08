@@ -10,7 +10,7 @@ from PyQt5.QtCore import QTimer, QDateTime, QTime, Qt
 from datetime import datetime, timedelta
 import time
 from threading import Thread, Lock
-from main_functions import save_config, get_cert_names, gather_mail, send_mail, validate_email, check_time, add_to_startup, config_path
+from main_functions import save_config, get_cert_names, gather_mail, send_mail, validate_email, check_time, add_to_startup, config_path, config, EdoWindow, agregate_edo_messages
 
 
 class MainWindow(QMainWindow):
@@ -87,8 +87,8 @@ class MainWindow(QMainWindow):
         self.plainTextEdit_log = self.findChild(QPlainTextEdit, 'plainTextEdit_log')
         pushButton_log = self.findChild(QPushButton, 'pushButton_log')
         pushButton_log.clicked.connect(lambda: os.startfile(os.path.join(config_path, 'log.log')))
-        pushButton_help = self.findChild(QPushButton, 'pushButton_help')
-        pushButton_help.clicked.connect(lambda: os.startfile(os.path.join(config_path, 'readme.txt')))
+        pushButton_edo = self.findChild(QPushButton, 'pushButton_edo')
+        pushButton_edo.clicked.connect(self.open_edo_settings)
         autorun = self.findChild(QCheckBox, 'checkBox_autorun')
         autorun.clicked.connect(add_to_startup)
         if config['checkBox_autorun'] and config['checkBox_autostart']:
@@ -107,6 +107,13 @@ class MainWindow(QMainWindow):
 
     def closeEvent(self, event):
         sys.exit(0)
+
+    def open_edo_settings(self):
+        self.connection_window = EdoWindow(self.config)
+        res = self.connection_window.exec_()
+        if res:
+            self.config = self.connection_window.config
+            save_config(self.config)
 
     def hide_to_tray(self):
         self.hide()
@@ -162,6 +169,8 @@ class MainWindow(QMainWindow):
                 self.add_log_message(f'ОШИБКА отправки файлов: {message_attachments}')
                 self.add_log_message(traceback_str)
                 traceback.print_exc()
+        if self.config.get('checkbox_use_edo', False):
+            agregate_edo_messages()
 
     def switch_tasker(self):
         if self.autostart_timer.isActive():
@@ -278,4 +287,9 @@ class MainWindow(QMainWindow):
                     valid = False
             if not valid:
                 errors.append('Некорректно указано время в расписании')
+        if self.config['checkbox_use_edo']:
+            if not os.path.isdir(self.config['lineedit_input_edo']):
+                errors.append('Некорректный путь для исходящих ЭДО')
+            if not os.path.isdir(self.config['lineedit_output_edo']):
+                errors.append('Некорректный путь для отправленных ЭДО')
         return errors
