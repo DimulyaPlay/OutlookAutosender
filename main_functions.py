@@ -94,7 +94,7 @@ def save_config(config):
 def get_cert_names(cert_mgr_path):
     if os.path.exists(cert_mgr_path):
         try:
-            result = subprocess.run([cert_mgr_path, '-list'], capture_output=True, text=True, check=True, encoding='cp866')
+            result = subprocess.run([cert_mgr_path, '-list'], capture_output=True, text=True, check=True, encoding='cp866', creationflags=subprocess.CREATE_NO_WINDOW)
             output = result.stdout
         except subprocess.CalledProcessError as e:
             print(f"Ошибка выполнения команды: {e}")
@@ -173,7 +173,7 @@ def archive_groups(groups):
 
 def encode_file(fp):
     subprocess.run([os.path.join(config['lineEdit_csp_path'], 'csptest.exe'), '-sfenc', '-encrypt', '-in', fp,
-                    '-out', f'{fp}.enc', '-cert', f'{config["comboBox_certs"]}'])
+                    '-out', f'{fp}.enc', '-cert', f'{config["comboBox_certs"]}'], creationflags=subprocess.CREATE_NO_WINDOW)
     return f'{fp}.enc'
 
 
@@ -196,82 +196,86 @@ def gather_mail():
 
 
 def agregate_edo_messages():
-    print('starting_messages')
-    outlook = win32com.client.Dispatch('Outlook.Application')
-    namespace = outlook.GetNamespace('MAPI')
-    current_filelist = glob(config['lineedit_input_edo'] + '/*')
-    current_filelist = [fp for fp in current_filelist if
-                        os.path.isfile(fp) and fp.endswith('.zip') and is_file_locked(fp)]
-    for archive in current_filelist:
-        foldername_extracted = archive[:-4]
-        if os.path.exists(foldername_extracted):
-            foldername_extracted = foldername_extracted + str(random.randint(1, 9999))
-        with ZipFile(archive, 'r') as zipObj:
-            zipObj.extractall(foldername_extracted)
-        with open(foldername_extracted+'\\meta.json', 'r') as metafile:
-            meta = json.load(metafile)
-        print(meta)
-        if meta['rr']:
-            att_enc = encode_file(archive)
-            message = outlook.CreateItem(0)
-            message.Subject = meta['subject']
-            message.Body = meta['body']
-            message.Attachments.Add(att_enc)
-            recipient = message.Recipients.Add(config.get('lineedit_rr_address', 'no_addres'))
-            recipient.Type = 1
-            sender = namespace.CreateRecipient(namespace.CurrentUser.Address)
-            sender.Resolve()
-            message.SendUsingAccount = sender
-            message.Send()
-        if meta['emails']:
-            message = outlook.CreateItem(0)
-            message.Subject = meta['subject']
-            message.Body = meta['body']
-            attachments = [os.path.join(foldername_extracted, fileName) for fileName in meta['fileNames']]
-            for att in attachments:
-                orig_att = att
-                temp_filepath = os.path.join(temp_path, os.path.basename(att))
-                shutil.copy(att, temp_filepath)
-                attachment = message.Attachments.Add(temp_filepath)
-                os.unlink(temp_filepath)
-                if config['checkBox_use_encryption']:
-                    os.unlink(att)
-            recipients = meta['emails'].split(';')
-            for r in recipients:
-                if validate_email(r):
-                    recipient = message.Recipients.Add(r)
-                    recipient.Type = 1
-            sender = namespace.CreateRecipient(namespace.CurrentUser.Address)
-            sender.Resolve()
-            message.SendUsingAccount = sender
-            message.Send()
-            sent_folder = namespace.GetDefaultFolder(5)
-            sorted_items = sorted(sent_folder.Items, key=lambda x: x.CreationTime, reverse=True)
-            sent_message = None
-            timeout = time.time() + 30  # Ждем не более 30 секунд
-            while not sent_message and time.time() < timeout:
+    try:
+        outlook = win32com.client.Dispatch('Outlook.Application')
+        namespace = outlook.GetNamespace('MAPI')
+        current_filelist = glob(config['lineedit_input_edo'] + '/*')
+        current_filelist = [fp for fp in current_filelist if
+                            os.path.isfile(fp) and fp.endswith('.zip') and is_file_locked(fp)]
+        for archive in current_filelist:
+            foldername_extracted = archive[:-4]
+            if os.path.exists(foldername_extracted):
+                foldername_extracted = foldername_extracted + str(random.randint(1, 9999))
+            with ZipFile(archive, 'r') as zipObj:
+                zipObj.extractall(foldername_extracted)
+            with open(foldername_extracted+'\\meta.json', 'r') as metafile:
+                meta = json.load(metafile)
+            if meta['rr']:
+                att_enc = encode_file(archive)
+                message = outlook.CreateItem(0)
+                message.Subject = meta['subject']
+                message.Body = meta['body']
+                message.Attachments.Add(att_enc)
+                recipient = message.Recipients.Add(config.get('lineedit_rr_address', 'no_addres'))
+                recipient.Type = 1
+                sender = namespace.CreateRecipient(namespace.CurrentUser.Address)
+                sender.Resolve()
+                message.SendUsingAccount = sender
+                message.Send()
+            if meta['emails']:
+                message = outlook.CreateItem(0)
+                message.Subject = meta['subject']
+                message.Body = meta['body']
+                attachments = [os.path.join(foldername_extracted, fileName) for fileName in meta['fileNames']]
+                for att in attachments:
+                    orig_att = att
+                    temp_filepath = os.path.join(temp_path, os.path.basename(att))
+                    shutil.copy(att, temp_filepath)
+                    attachment = message.Attachments.Add(temp_filepath)
+                    os.unlink(temp_filepath)
+                    if config['checkBox_use_encryption']:
+                        os.unlink(att)
+                recipients = meta['emails'].split(';')
+                for r in recipients:
+                    if validate_email(r):
+                        recipient = message.Recipients.Add(r)
+                        recipient.Type = 1
+                sender = namespace.CreateRecipient(namespace.CurrentUser.Address)
+                sender.Resolve()
+                message.SendUsingAccount = sender
+                message.Send()
                 sent_folder = namespace.GetDefaultFolder(5)
                 sorted_items = sorted(sent_folder.Items, key=lambda x: x.CreationTime, reverse=True)
-                for item in sorted_items[:5]:
-                    if item.Subject == meta['subject']:
-                        sent_message = item
-                        break
-                time.sleep(1)
-            printer_name = 'PDF24EDO'
-            default_printer = win32print.GetDefaultPrinter()
-            if default_printer != printer_name:
-                win32print.SetDefaultPrinter(printer_name)
-            sent_message.PrintOut()
-            win32print.SetDefaultPrinter(default_printer)
-            report_found = False
-            pdf_report = os.path.join(config['lineedit_output_edo'], f'reports\\{meta["id"]}.pdf')
-            while not report_found:
-                flist = glob(config['lineedit_output_edo'] + '\\' + '*.pdf')
-                for f in flist:
-                    if is_file_locked(f):
-                        shutil.move(f, pdf_report)
-                        report_found = True
-        shutil.move(archive, os.path.join(config['lineedit_output_edo'], 'reports'))
+                sent_message = None
+                timeout = time.time() + 30  # Ждем не более 30 секунд
+                while not sent_message and time.time() < timeout:
+                    sent_folder = namespace.GetDefaultFolder(5)
+                    sorted_items = sorted(sent_folder.Items, key=lambda x: x.CreationTime, reverse=True)
+                    for item in sorted_items[:5]:
+                        if item.Subject == meta['subject']:
+                            sent_message = item
+                            break
+                    time.sleep(1)
+                printer_name = 'PDF24EDO'
+                default_printer = win32print.GetDefaultPrinter()
+                if default_printer != printer_name:
+                    win32print.SetDefaultPrinter(printer_name)
+                sent_message.PrintOut()
+                win32print.SetDefaultPrinter(default_printer)
+                report_found = False
+                pdf_report = os.path.join(config['lineedit_output_edo'], f'reports\\{meta["id"]}.pdf')
+                while not report_found:
+                    flist = glob(config['lineedit_output_edo'] + '\\' + '*.pdf')
+                    for f in flist:
+                        if is_file_locked(f):
+                            shutil.move(f, pdf_report)
+                            report_found = True
+            shutil.rmtree(foldername_extracted)
+            shutil.move(archive, os.path.join(config['lineedit_output_edo']))
+        return True
+    except:
+        traceback.print_exc()
+        return False
 
 
 def send_mail(attachments, manual=True):

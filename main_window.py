@@ -170,7 +170,11 @@ class MainWindow(QMainWindow):
                 self.add_log_message(traceback_str)
                 traceback.print_exc()
         if self.config.get('checkbox_use_edo', False):
-            agregate_edo_messages()
+            res = agregate_edo_messages()
+            if res:
+                self.add_log_message(f'Эл. письма из СО ЭД отправлены')
+            else:
+                self.add_log_message(f'Ошибка при отправке писем СО ЭД')
 
     def switch_tasker(self):
         if self.autostart_timer.isActive():
