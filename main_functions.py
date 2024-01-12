@@ -263,9 +263,9 @@ def agregate_edo_messages():
                 sent_message.PrintOut()
                 win32print.SetDefaultPrinter(default_printer)
                 report_found = False
-                pdf_report = os.path.join(config['lineedit_output_edo'], f'reports\\{meta["id"]}.pdf')
+                pdf_report = os.path.join(config['lineedit_output_edo'], f'\\{meta["id"]}.pdf')
                 while not report_found:
-                    flist = glob(config['lineedit_output_edo'] + '\\' + '*.pdf')
+                    flist = glob(os.path.join(config_path, "ReportsPrinted") + "\\" + '*.pdf')
                     for f in flist:
                         if is_file_locked(f):
                             shutil.move(f, pdf_report)
