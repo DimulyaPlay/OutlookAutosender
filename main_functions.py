@@ -20,6 +20,8 @@ import winreg
 import win32print
 from zipfile import ZipFile
 import random
+import pythoncom
+pythoncom.CoInitialize()
 
 
 config_path = os.path.dirname(sys.argv[0])
@@ -31,6 +33,9 @@ else:
     os.mkdir(temp_path)
 if not os.path.exists(config_path):
     os.mkdir(config_path)
+ReportsPrinted = os.path.join(config_path, 'ReportsPrinted')
+if not os.path.exists(ReportsPrinted):
+    os.mkdir(ReportsPrinted)
 config_file = os.path.join(config_path, 'config.json')
 
 
@@ -60,12 +65,16 @@ def read_create_config(config_file):
         'checkbox_use_edo': False,
         'lineedit_input_edo': '',
         'lineedit_output_edo': '',
-        'lineedit_rr_address': ''
+        'lineedit_rr_address': '',
+        'checkBox_autosend_edo': False
     }
     if os.path.exists(config_file):
         try:
             with open(config_file, 'r') as configfile:
                 config = json.load(configfile)
+                for key in default_configuration.keys():
+                    if key not in config.keys():
+                        config[key] = default_configuration[key]
         except Exception as e:
             print(e)
             os.remove(config_file)
@@ -157,10 +166,13 @@ def archive_groups(groups):
                 if config['checkBox_with_sig_only']:
                     sig_file_path1 = file_path + '.sig'
                     sig_file_path2 = file_path + '..sig'
+                    sig_file_path3 = file_path + '.1.sig'
                     if os.path.isfile(sig_file_path1):
                         sig_file_path = sig_file_path1
                     elif os.path.isfile(sig_file_path2):
                         sig_file_path = sig_file_path2
+                    elif os.path.isfile(sig_file_path3):
+                        sig_file_path = sig_file_path3
                     arcname = os.path.basename(sig_file_path)
                     zip_file.write(sig_file_path, arcname=arcname)
                     filenames.append(os.path.basename(sig_file_path))
@@ -180,11 +192,11 @@ def encode_file(fp):
 def gather_mail():
     current_filelist = glob(config['lineEdit_get_path'] + '/*')
     current_filelist = [fp for fp in current_filelist if
-                        os.path.isfile(fp) and not fp.endswith(('desktop.ini', 'swapfile.sys')) and is_file_locked(fp)]
+                        os.path.isfile(fp) and not fp.endswith(('desktop.ini', 'swapfile.sys', 'Thumbs.db')) and is_file_locked(fp)]
     new_list = []
     if config['checkBox_with_sig_only']:
         for fp in current_filelist:
-            if fp + '.sig' in current_filelist or fp + '..sig' in current_filelist:
+            if fp + '.sig' in current_filelist or fp + '..sig' in current_filelist or fp + '.1.sig' in current_filelist:
                 new_list.append(fp)
     else:
         new_list = current_filelist
@@ -197,11 +209,13 @@ def gather_mail():
 
 def agregate_edo_messages():
     try:
+        pythoncom.CoInitialize()
         outlook = win32com.client.Dispatch('Outlook.Application')
         namespace = outlook.GetNamespace('MAPI')
         current_filelist = glob(config['lineedit_input_edo'] + '/*')
         current_filelist = [fp for fp in current_filelist if
                             os.path.isfile(fp) and fp.endswith('.zip') and is_file_locked(fp)]
+        sent_files = []
         for archive in current_filelist:
             foldername_extracted = archive[:-4]
             if os.path.exists(foldername_extracted):
@@ -213,18 +227,21 @@ def agregate_edo_messages():
             if meta['rr']:
                 att_enc = encode_file(archive)
                 message = outlook.CreateItem(0)
-                message.Subject = meta['subject']
+                message.Subject = meta['subject'] if meta['subject'] else os.path.basename(archive)
                 message.Body = meta['body']
                 message.Attachments.Add(att_enc)
+                os.unlink(att_enc)
                 recipient = message.Recipients.Add(config.get('lineedit_rr_address', 'no_addres'))
                 recipient.Type = 1
                 sender = namespace.CreateRecipient(namespace.CurrentUser.Address)
                 sender.Resolve()
                 message.SendUsingAccount = sender
                 message.Send()
+                sent_files.append(f'В РР отправлены файлы: {", ".join(meta["fileNames"])}')
             if meta['emails']:
                 message = outlook.CreateItem(0)
-                message.Subject = meta['subject']
+                subject = f'[{meta["id"]}] '+meta['subject']
+                message.Subject = subject
                 message.Body = meta['body']
                 attachments = [os.path.join(foldername_extracted, fileName) for fileName in meta['fileNames']]
                 for att in attachments:
@@ -244,38 +261,49 @@ def agregate_edo_messages():
                 sender.Resolve()
                 message.SendUsingAccount = sender
                 message.Send()
-                sent_folder = namespace.GetDefaultFolder(5)
-                sorted_items = sorted(sent_folder.Items, key=lambda x: x.CreationTime, reverse=True)
-                sent_message = None
-                timeout = time.time() + 30  # Ждем не более 30 секунд
-                while not sent_message and time.time() < timeout:
+                sent_files.append(f'В адреса {meta["emails"]} отправлены файлы: {", ".join(meta["fileNames"])}')
+                try:
                     sent_folder = namespace.GetDefaultFolder(5)
                     sorted_items = sorted(sent_folder.Items, key=lambda x: x.CreationTime, reverse=True)
-                    for item in sorted_items[:5]:
-                        if item.Subject == meta['subject']:
-                            sent_message = item
-                            break
-                    time.sleep(1)
-                printer_name = 'PDF24EDO'
-                default_printer = win32print.GetDefaultPrinter()
-                if default_printer != printer_name:
-                    win32print.SetDefaultPrinter(printer_name)
-                sent_message.PrintOut()
-                win32print.SetDefaultPrinter(default_printer)
-                report_found = False
-                pdf_report = os.path.join(config['lineedit_output_edo'], f'\\{meta["id"]}.pdf')
-                while not report_found:
-                    flist = glob(os.path.join(config_path, "ReportsPrinted") + "\\" + '*.pdf')
-                    for f in flist:
-                        if is_file_locked(f):
-                            shutil.move(f, pdf_report)
-                            report_found = True
+                    sent_message = None
+                    timeout = time.time() + 30  # Ждем не более 30 секунд
+                    while not sent_message and time.time() < timeout:
+                        sent_folder = namespace.GetDefaultFolder(5)
+                        sorted_items = sorted(sent_folder.Items, key=lambda x: x.CreationTime, reverse=True)
+                        for item in sorted_items[:5]:
+                            if item.Subject == subject:
+                                sent_message = item
+                                break
+                        time.sleep(1)
+                    [os.remove(fp) for fp in glob(ReportsPrinted + "\\" + '*.pdf')]
+                    printer_name = 'PDF24EDO'
+                    default_printer = win32print.GetDefaultPrinter()
+                    if default_printer != printer_name:
+                        win32print.SetDefaultPrinter(printer_name)
+                    sent_message.PrintOut()
+                    win32print.SetDefaultPrinter(default_printer)
+                    report_found = False
+                    pdf_report = os.path.join(config['lineedit_output_edo'], f'\\{meta["id"]}.pdf')
+                    while not report_found:
+                        flist = glob(ReportsPrinted + "\\" + '*.pdf')
+                        for f in flist:
+                            if is_file_locked(f):
+                                shutil.move(f, pdf_report)
+                                report_found = True
+                    sent_files.append(f'Отчет об отправке сохранен по пути {pdf_report}')
+                except Exception as e:
+                    sent_files.append(f'Но не удалось сохранить отчет об отправке: {e}')
+                    traceback.print_exc()
             shutil.rmtree(foldername_extracted)
-            shutil.move(archive, os.path.join(config['lineedit_output_edo']))
-        return True
+            shutil.move(archive, os.path.join(config['lineedit_input_edo'], 'sent'))
+        if not sent_files:
+            return 0
+        return '\n'.join(sent_files)
     except:
         traceback.print_exc()
-        return False
+        return -1
+    finally:
+        pythoncom.CoUninitialize()
 
 
 def send_mail(attachments, manual=True):
@@ -313,6 +341,7 @@ def send_mail(attachments, manual=True):
         message.Display()
     else:
         message.Send()
+    del outlook
 
 
 def validate_email(email):

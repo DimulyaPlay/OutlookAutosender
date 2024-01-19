@@ -11,6 +11,8 @@ from datetime import datetime, timedelta
 import time
 from threading import Thread, Lock
 from main_functions import save_config, get_cert_names, gather_mail, send_mail, validate_email, check_time, add_to_startup, config_path, config, EdoWindow, agregate_edo_messages
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
 
 
 class MainWindow(QMainWindow):
@@ -84,6 +86,12 @@ class MainWindow(QMainWindow):
         self.start_scheduler.clicked.connect(self.switch_tasker)
         self.start_manual = self.findChild(QPushButton, 'pushButton_create_mail_now')
         self.start_manual.clicked.connect(lambda: self.send_mail_manual(True))
+        pushButto_send_edo_manual = self.findChild(QPushButton, 'pushButto_send_edo_manual')
+        pushButto_send_edo_manual.clicked.connect(self.send_edo_messages)
+        checkBox_autosend_edo = self.findChild(QCheckBox, 'checkBox_autosend_edo')
+        checkBox_autosend_edo.stateChanged.connect(self.toggle_edo_autosender)
+        checkBox_autosend_edo.setChecked(config['checkBox_autosend_edo'])
+
         self.plainTextEdit_log = self.findChild(QPlainTextEdit, 'plainTextEdit_log')
         pushButton_log = self.findChild(QPushButton, 'pushButton_log')
         pushButton_log.clicked.connect(lambda: os.startfile(os.path.join(config_path, 'log.log')))
@@ -91,6 +99,16 @@ class MainWindow(QMainWindow):
         pushButton_edo.clicked.connect(self.open_edo_settings)
         autorun = self.findChild(QCheckBox, 'checkBox_autorun')
         autorun.clicked.connect(add_to_startup)
+        # Создание обработчика событий
+        self.event_handler = MyHandler(self)
+        self.observer = Observer()
+        self.directory_to_watch = self.config['lineedit_input_edo']
+        self.update_interval = 1000
+        self.observer.schedule(self.event_handler, path=self.directory_to_watch, recursive=False)
+        self.autostart_timer = QTimer(self)
+        self.autostart_timer.timeout.connect(self.switch_tasker)
+        if config['checkBox_autosend_edo']:
+            self.toggle_edo_autosender(2)
         if config['checkBox_autorun'] and config['checkBox_autostart']:
             mm, ss = config['timeEdit_connecting_delay'].split(':')
             secs = int(mm) * 60 + int(ss)
@@ -149,6 +167,7 @@ class MainWindow(QMainWindow):
         save_config(self.config)
 
     def send_mail_manual(self, manual):
+        print('here')
         errors = self.check_fields(manual)
         if errors:
             self.add_log_message('\n'.join(errors))
@@ -169,12 +188,6 @@ class MainWindow(QMainWindow):
                 self.add_log_message(f'ОШИБКА отправки файлов: {message_attachments}')
                 self.add_log_message(traceback_str)
                 traceback.print_exc()
-        if self.config.get('checkbox_use_edo', False):
-            res = agregate_edo_messages()
-            if res:
-                self.add_log_message(f'Эл. письма из СО ЭД отправлены')
-            else:
-                self.add_log_message(f'Ошибка при отправке писем СО ЭД')
 
     def switch_tasker(self):
         if self.autostart_timer.isActive():
@@ -297,3 +310,42 @@ class MainWindow(QMainWindow):
             if not os.path.isdir(self.config['lineedit_output_edo']):
                 errors.append('Некорректный путь для отправленных ЭДО')
         return errors
+
+    def send_edo_messages(self):
+        self.add_log_message('Начинается отправка пакетов СО ЕД')
+        if not os.path.isdir(self.config['lineedit_input_edo']):
+            self.add_log_message('Некорректный путь для исходящих СО ЭД')
+            return
+        if not os.path.isdir(self.config['lineedit_output_edo']):
+            self.add_log_message('Некорректный путь для отправленных СО ЭД')
+            return
+        if self.config.get('checkbox_use_edo', False):
+            res = agregate_edo_messages()
+            if isinstance(res, str):
+                self.add_log_message(f'Эл. письма из СО ЭД отправлены')
+                self.add_log_message(res)
+            elif res == -1:
+                self.add_log_message(f'Ошибка при отправке писем СО ЭД')
+        else:
+            self.add_log_message('Обмен с СО ЭД отключен параметрах СО ЭД')
+        self.add_log_message('Все пакеты были отправлены (если они были)')
+
+    def toggle_edo_autosender(self, state):
+        if state == 2:
+            self.observer.start()
+            self.add_log_message(f'Наблюдение за директорией "{self.directory_to_watch}" включено')
+        else:
+            self.observer.stop()
+            self.observer.join()
+            self.add_log_message(f'Наблюдение за директорией "{self.directory_to_watch}" выключено')
+
+
+class MyHandler(FileSystemEventHandler):
+    def __init__(self, main_window):
+        super().__init__()
+        self.main_window = main_window
+
+    def on_created(self, event):
+        if event.is_directory:
+            return
+        self.main_window.send_edo_messages()
