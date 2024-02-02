@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Параметры ЭДО</string>
+   <string>Параметры СО ЭД</string>
   </property>
   <layout class="QGridLayout" name="gridLayout">
    <item row="4" column="0">
@@ -37,7 +37,7 @@
    <item row="0" column="0">
     <widget class="QCheckBox" name="checkbox_use_edo">
      <property name="text">
-      <string>Использовать систему ЭДО</string>
+      <string>Использовать систему СО ЭД</string>
      </property>
     </widget>
    </item>
