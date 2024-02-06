@@ -10,7 +10,7 @@ from PyQt5.QtCore import QTimer, QDateTime, QTime, Qt
 from datetime import datetime, timedelta
 import time
 from threading import Thread, Lock
-from main_functions import save_config, get_cert_names, gather_mail, send_mail, validate_email, check_time, add_to_startup, config_path, config, EdoWindow, agregate_edo_messages
+from main_functions import save_config, get_cert_names, gather_mail, send_mail, validate_email, check_time, add_to_startup, config_path, config, EdoWindow, is_file_locked, agregate_edo_messages
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
@@ -311,7 +311,7 @@ class MainWindow(QMainWindow):
                 errors.append('Некорректный путь для отправленных ЭДО')
         return errors
 
-    def send_edo_messages(self):
+    def send_edo_messages(self, file_list):
         self.add_log_message('Начинается отправка пакетов СО ЕД')
         if not os.path.isdir(self.config['lineedit_input_edo']):
             self.add_log_message('Некорректный путь для исходящих СО ЭД')
@@ -320,7 +320,7 @@ class MainWindow(QMainWindow):
             self.add_log_message('Некорректный путь для отправленных СО ЭД')
             return
         if self.config.get('checkbox_use_edo', False):
-            res = agregate_edo_messages()
+            res = agregate_edo_messages(file_list)
             if isinstance(res, str):
                 self.add_log_message(f'Эл. письма из СО ЭД отправлены')
                 self.add_log_message(res)
@@ -344,8 +344,35 @@ class MyHandler(FileSystemEventHandler):
     def __init__(self, main_window):
         super().__init__()
         self.main_window = main_window
+        self.lock = Lock()
+        self.ready_files = []  # Список для накопления готовых файлов
+        self.batch_size = 5  # Количество файлов, после накопления которых начнется обработка
+        self.timeout = 10  # Таймаут в секундах для отправки файлов на обработку
+        Thread(target=self.timeout_check, daemon=True).start()
 
-    def on_created(self, event):
-        if event.is_directory:
-            return
-        self.main_window.send_edo_messages()
+    def add_file(self, file_path):
+        with self.lock:
+            self.ready_files.append(file_path)
+            if len(self.ready_files) >= self.batch_size:
+                self.process_files()
+
+    def process_files(self):
+        if self.ready_files:
+            # Отправляем скопированные файлы на обработку
+            self.main_window.send_edo_messages(self.ready_files)
+            self.ready_files = []  # Очищаем список после обработки
+
+    def timeout_check(self):
+        while True:
+            time.sleep(self.timeout)
+            with self.lock:
+                if self.ready_files:
+                    self.process_files()
+
+    def on_moved(self, event):
+        super().on_moved(event)
+        if not event.is_directory:
+            src_path = event.src_path
+            dest_path = event.dest_path
+            if dest_path.endswith('.zip'):
+                self.add_file(dest_path)

@@ -120,12 +120,17 @@ def get_cert_names(cert_mgr_path):
 
 
 def is_file_locked(filepath):
+    file_handle = None
     try:
-        file_handle = open(filepath, 'a')
-        msvcrt.locking(file_handle.fileno(), msvcrt.LK_NBLCK, 1)
-        return True
-    except:
+        file_handle = open(filepath, 'a')  # Попытка открыть файл для добавления данных
+        msvcrt.locking(file_handle.fileno(), msvcrt.LK_NBLCK, 1)  # Попытка заблокировать файл
+        # Если мы здесь, значит файл не заблокирован и его можно обрабатывать
         return False
+    except:
+        return True
+    finally:
+        if file_handle:
+            file_handle.close()  # Не забываем закрыть файл
 
 
 def split_files_into_groups(file_paths):
@@ -192,7 +197,7 @@ def encode_file(fp):
 def gather_mail():
     current_filelist = glob(config['lineEdit_get_path'] + '/*')
     current_filelist = [fp for fp in current_filelist if
-                        os.path.isfile(fp) and not fp.endswith(('desktop.ini', 'swapfile.sys', 'Thumbs.db')) and is_file_locked(fp)]
+                        os.path.isfile(fp) and not fp.endswith(('desktop.ini', 'swapfile.sys', 'Thumbs.db')) and not is_file_locked(fp)]
     new_list = []
     if config['checkBox_with_sig_only']:
         for fp in current_filelist:
@@ -207,14 +212,11 @@ def gather_mail():
     return groups_for_send, groups_filenames
 
 
-def agregate_edo_messages():
+def agregate_edo_messages(current_filelist):
     try:
         pythoncom.CoInitialize()
         outlook = win32com.client.Dispatch('Outlook.Application')
         namespace = outlook.GetNamespace('MAPI')
-        current_filelist = glob(config['lineedit_input_edo'] + '/*')
-        current_filelist = [fp for fp in current_filelist if
-                            os.path.isfile(fp) and fp.endswith('.zip') and is_file_locked(fp)]
         sent_files = []
         for archive in current_filelist:
             foldername_extracted = archive[:-4]
@@ -287,7 +289,7 @@ def agregate_edo_messages():
                     while not report_found:
                         flist = glob(ReportsPrinted + "\\" + '*.pdf')
                         for f in flist:
-                            if is_file_locked(f):
+                            if not is_file_locked(f):
                                 shutil.move(f, pdf_report)
                                 report_found = True
                     sent_files.append(f'Отчет об отправке сохранен по пути {pdf_report}')
