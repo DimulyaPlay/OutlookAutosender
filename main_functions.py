@@ -1,7 +1,7 @@
 import json
 import os
 import shutil
-import traceback
+from traceback import print_exc
 import msvcrt
 from glob import glob
 import zipfile
@@ -18,11 +18,18 @@ from PyQt5 import uic
 from PyQt5.QtGui import QIcon
 import winreg
 import win32print
-from zipfile import ZipFile
 import random
 import pythoncom
+from PyPDF2 import PdfReader, PdfWriter
 pythoncom.CoInitialize()
 
+
+def save_config(config_file, config):
+    try:
+        with open(config_file, 'w') as json_file:
+            json.dump(config, json_file)
+    except:
+        print_exc()
 
 config_path = os.path.dirname(sys.argv[0])
 temp_path = os.path.join(config_path, 'temp')
@@ -39,7 +46,7 @@ if not os.path.exists(ReportsPrinted):
 config_file = os.path.join(config_path, 'config.json')
 
 
-def read_create_config(config_file):
+def load_or_create_default_config(config_file):
     default_configuration = {
         'job_id': 0,
         'lineEdit_get_path': r'',
@@ -68,36 +75,26 @@ def read_create_config(config_file):
         'lineedit_rr_address': '',
         'checkBox_autosend_edo': False
     }
-    if os.path.exists(config_file):
-        try:
-            with open(config_file, 'r') as configfile:
-                config = json.load(configfile)
-                for key in default_configuration.keys():
-                    if key not in config.keys():
-                        config[key] = default_configuration[key]
-        except Exception as e:
-            print(e)
-            os.remove(config_file)
-            config = default_configuration
-            with open(config_file, 'w') as configfile:
-                json.dump(config, configfile)
-    else:
+    if not os.path.exists(config_file):
+        save_config(config_file, default_configuration)
+    return default_configuration
+
+
+def read_create_config(config_file):
+    default_configuration = load_or_create_default_config(config_file)
+    try:
+        with open(config_file, 'r') as configfile:
+            config = json.load(configfile)
+            for key, value in default_configuration.items():
+                config.setdefault(key, value)
+    except:
+        save_config(config_file, default_configuration)
         config = default_configuration
-        with open(config_file, 'w') as configfile:
-            json.dump(config, configfile)
+        print_exc()
     return config
 
 
 config = read_create_config(config_file)
-
-
-def save_config(config):
-    try:
-        with open(config_file, 'w') as json_file:
-            json.dump(config, json_file)
-        config = read_create_config(config_file)
-    except:
-        traceback.print_exc()
 
 
 def get_cert_names(cert_mgr_path):
@@ -149,7 +146,7 @@ def split_files_into_groups(file_paths):
         if current_group:
             all_groups.append(current_group)
     except:
-        traceback.print_exc()
+        print_exc()
     return all_groups
 
 
@@ -158,7 +155,7 @@ def archive_groups(groups):
     archived_groups_names_files = []
     for i, group in enumerate(groups):
         config["job_id"] = config["job_id"] + i + 1
-        save_config(config)
+        save_config(config_file, config)
         read_create_config(config_file)
         archname = config['lineEdit_archname']
         zip_filename = os.path.join(config['lineEdit_get_path'], f'{archname}_{datetime.now().strftime("%Y-%m-%d_%H-%M-%S")}_job{config["job_id"]}.zip')
@@ -219,18 +216,23 @@ def agregate_edo_messages(current_filelist):
         namespace = outlook.GetNamespace('MAPI')
         sent_files = []
         for archive in current_filelist:
+            reports_found = []
             foldername_extracted = archive[:-4]
             if os.path.exists(foldername_extracted):
                 foldername_extracted = foldername_extracted + str(random.randint(1, 9999))
-            with ZipFile(archive, 'r') as zipObj:
+            with zipfile.ZipFile(archive, 'r') as zipObj:
                 zipObj.extractall(foldername_extracted)
+                zip_filelist = [f'{num+1}. {zipf.filename}' for num, zipf in enumerate(zipObj.filelist)]
             with open(foldername_extracted+'\\meta.json', 'r') as metafile:
                 meta = json.load(metafile)
+            subject = f'{meta["id"]}] ' + meta['subject'] if meta['subject'] else os.path.basename(archive)
+            [os.remove(fp) for fp in glob(ReportsPrinted + "\\" + '*.pdf')]
             if meta['rr']:
                 att_enc = encode_file(archive)
                 message = outlook.CreateItem(0)
-                message.Subject = meta['subject'] if meta['subject'] else os.path.basename(archive)
-                message.Body = meta['body']
+                message.Subject = "[rr-"+subject
+                body_text = meta['body'] + '\n' + "Список направляемых файлов:" + '\n' + "\n".join(zip_filelist)
+                message.Body = body_text
                 message.Attachments.Add(att_enc)
                 os.unlink(att_enc)
                 recipient = message.Recipients.Add(config.get('lineedit_rr_address', 'no_addres'))
@@ -240,17 +242,20 @@ def agregate_edo_messages(current_filelist):
                 message.SendUsingAccount = sender
                 message.Send()
                 sent_files.append(f'В РР отправлены файлы: {", ".join(meta["fileNames"])}')
+                pdf_report_rr = os.path.join(ReportsPrinted, f'\\rr-{meta["id"]}.pdf')
+                sf, rf = gather_report_from_sent_items(namespace, "[rr-" + subject, pdf_report_rr)
+                sent_files.extend(sf)
+                if rf:
+                    reports_found.append(pdf_report_rr)
             if meta['emails']:
                 message = outlook.CreateItem(0)
-                subject = f'[{meta["id"]}] '+meta['subject']
-                message.Subject = subject
+                message.Subject = "[eml-"+subject
                 message.Body = meta['body']
                 attachments = [os.path.join(foldername_extracted, fileName) for fileName in meta['fileNames']]
                 for att in attachments:
-                    orig_att = att
                     temp_filepath = os.path.join(temp_path, os.path.basename(att))
                     shutil.copy(att, temp_filepath)
-                    attachment = message.Attachments.Add(temp_filepath)
+                    message.Attachments.Add(temp_filepath)
                     os.unlink(temp_filepath)
                     if config['checkBox_use_encryption']:
                         os.unlink(att)
@@ -264,48 +269,77 @@ def agregate_edo_messages(current_filelist):
                 message.SendUsingAccount = sender
                 message.Send()
                 sent_files.append(f'В адреса {meta["emails"]} отправлены файлы: {", ".join(meta["fileNames"])}')
-                try:
-                    sent_folder = namespace.GetDefaultFolder(5)
-                    sorted_items = sorted(sent_folder.Items, key=lambda x: x.CreationTime, reverse=True)
-                    sent_message = None
-                    timeout = time.time() + 30  # Ждем не более 30 секунд
-                    while not sent_message and time.time() < timeout:
-                        sent_folder = namespace.GetDefaultFolder(5)
-                        sorted_items = sorted(sent_folder.Items, key=lambda x: x.CreationTime, reverse=True)
-                        for item in sorted_items[:5]:
-                            if item.Subject == subject:
-                                sent_message = item
-                                break
-                        time.sleep(1)
-                    [os.remove(fp) for fp in glob(ReportsPrinted + "\\" + '*.pdf')]
-                    printer_name = 'PDF24EDO'
-                    default_printer = win32print.GetDefaultPrinter()
-                    if default_printer != printer_name:
-                        win32print.SetDefaultPrinter(printer_name)
-                    sent_message.PrintOut()
-                    win32print.SetDefaultPrinter(default_printer)
-                    report_found = False
-                    pdf_report = os.path.join(config['lineedit_output_edo'], f'\\{meta["id"]}.pdf')
-                    while not report_found:
-                        flist = glob(ReportsPrinted + "\\" + '*.pdf')
-                        for f in flist:
-                            if not is_file_locked(f):
-                                shutil.move(f, pdf_report)
-                                report_found = True
-                    sent_files.append(f'Отчет об отправке сохранен по пути {pdf_report}')
-                except Exception as e:
-                    sent_files.append(f'Но не удалось сохранить отчет об отправке: {e}')
-                    traceback.print_exc()
+                pdf_report_eml = os.path.join(ReportsPrinted, f'\\eml-{meta["id"]}.pdf')
+                sf, rf = gather_report_from_sent_items(namespace, "[eml-"+subject, pdf_report_eml)
+                sent_files.extend(sf)
+                if rf:
+                    reports_found.append(pdf_report_eml)
+            pdf_report = os.path.join(config['lineedit_output_edo'], f'\\{meta["id"]}.pdf')
+            create_final_report(reports_found, pdf_report)
             shutil.rmtree(foldername_extracted)
             shutil.move(archive, os.path.join(config['lineedit_input_edo'], 'sent'))
         if not sent_files:
             return 0
         return '\n'.join(sent_files)
     except:
-        traceback.print_exc()
+        print_exc()
         return -1
     finally:
         pythoncom.CoUninitialize()
+
+
+def gather_report_from_sent_items(namespace, tracked_msg_subject, pdf_report):
+    sent_files = []
+    try:
+        sent_message = None
+        report_found = False
+        timeout = time.time() + 30  # Ждем не более 30 секунд
+        while not sent_message and time.time() < timeout:
+            sent_folder = namespace.GetDefaultFolder(5)
+            sorted_items = sorted(sent_folder.Items, key=lambda x: x.CreationTime, reverse=True)
+            for item in sorted_items[:5]:
+                if item.Subject == tracked_msg_subject:
+                    sent_message = item
+                    break
+            time.sleep(1)
+        if sent_message:
+            printer_name = 'PDF24EDO'
+            default_printer = win32print.GetDefaultPrinter()
+            if default_printer != printer_name:
+                win32print.SetDefaultPrinter(printer_name)
+            sent_message.PrintOut()
+            win32print.SetDefaultPrinter(default_printer)
+            while not report_found:
+                flist = glob(ReportsPrinted + "\\" + '*.pdf')
+                for f in flist:
+                    if not is_file_locked(f):
+                        shutil.move(f, pdf_report)
+                        report_found = True
+            sent_files.append(f'Отчет об отправке сохранен по пути {pdf_report}')
+            return sent_files, report_found
+        else:
+            sent_files.append(f'Истекло время ожидания появления письма в папке отправленных.')
+            return sent_files, report_found
+    except Exception as e:
+        sent_files.append(f'Но не удалось сохранить отчет об отправке: {e}')
+        print_exc()
+        return sent_files, False
+
+
+def create_final_report(filepaths_to_concat, export_filepath):
+    if filepaths_to_concat:
+        if len(filepaths_to_concat)>1:
+            writer = PdfWriter()
+
+            for filepath in filepaths_to_concat:
+                reader = PdfReader(filepath)
+                for page in reader.pages:
+                    writer.add_page(page)
+
+            with open(export_filepath, 'wb') as f:
+                writer.write(f)
+        else:
+            shutil.move(filepaths_to_concat[0], export_filepath)
 
 
 def send_mail(attachments, manual=True):
@@ -315,23 +349,27 @@ def send_mail(attachments, manual=True):
         return
     outlook = win32com.client.Dispatch('Outlook.Application')
     namespace = outlook.GetNamespace('MAPI')
-
     message = outlook.CreateItem(0)
     message.Subject = config['lineEdit_subject']
-    message.Body = config['plainTextEdit_body']
-
-    for att in attachments:
+    attachments_list = []
+    for main_num, att in enumerate(attachments):
+        if att.endswith('zip'):
+            with zipfile.ZipFile(att, 'r') as zipObj:
+                attachments_list.extend([f'{main_num+1}.{num + 1}. {zipf.filename}' for num, zipf in enumerate(zipObj.filelist)])
+        else:
+            attachments_list.append(f"{main_num+1}. {os.path.basename(att)}")
         orig_att = att
         if config['checkBox_use_encryption']:
             orig_att = att
             att = encode_file(att)
         temp_filepath = os.path.join(temp_path, os.path.basename(att))
         shutil.copy(att, temp_filepath)
-        attachment = message.Attachments.Add(temp_filepath)
+        message.Attachments.Add(temp_filepath)
         os.unlink(temp_filepath)
         shutil.move(orig_att, config['lineEdit_put_path'])
         if config['checkBox_use_encryption']:
             os.unlink(att)
+    message.Body = config['plainTextEdit_body']+"\n"+"Список направляемых документов:"+"\n"+"\n".join(attachments_list)
     for r in recipients:
         if validate_email(r):
             recipient = message.Recipients.Add(r)
@@ -398,19 +436,19 @@ class EdoWindow(QDialog):
         ui_file = 'UI/edo.ui'
         uic.loadUi(ui_file, self)
         icon = QIcon("UI/icons8-carrier-pigeon-64.png")
+        self.config = {}
         self.setWindowIcon(icon)
-        self.config = config
         self.checkBox_use_edo = self.findChild(QCheckBox, 'checkbox_use_edo')
-        self.checkBox_use_edo.setChecked(self.config.get('checkbox_use_edo', False))
+        self.checkBox_use_edo.setChecked(config.get('checkbox_use_edo', False))
         self.checkBox_use_edo.clicked.connect(lambda: self.save_params('checkbox_use_edo'))
         self.lineEdit_input_edo = self.findChild(QLineEdit, 'lineedit_input_edo')
-        self.lineEdit_input_edo.setText(self.config.get('lineedit_input_edo', ''))
+        self.lineEdit_input_edo.setText(config.get('lineedit_input_edo', ''))
         self.lineEdit_input_edo.textChanged.connect(lambda: self.save_params('lineedit_input_edo'))
         self.lineEdit_output_edo = self.findChild(QLineEdit, 'lineedit_output_edo')
-        self.lineEdit_output_edo.setText(self.config.get('lineedit_output_edo', ''))
+        self.lineEdit_output_edo.setText(config.get('lineedit_output_edo', ''))
         self.lineEdit_output_edo.textChanged.connect(lambda: self.save_params('lineedit_output_edo'))
         self.lineEdit_rr_address = self.findChild(QLineEdit, 'lineedit_rr_address')
-        self.lineEdit_rr_address.setText(self.config.get('lineedit_rr_address', ''))
+        self.lineEdit_rr_address.setText(config.get('lineedit_rr_address', ''))
         self.lineEdit_rr_address.textChanged.connect(lambda: self.save_params('lineedit_rr_address'))
 
     def save_params(self, lineEdit_name):

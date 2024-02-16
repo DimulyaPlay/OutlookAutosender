@@ -1,3 +1,4 @@
 PyQt5~=5.15.10
 pywin32
-winshell
+winshell~=0.6
+watchdog~=3.0.0

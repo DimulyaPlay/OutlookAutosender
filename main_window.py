@@ -10,7 +10,7 @@ from PyQt5.QtCore import QTimer, QDateTime, QTime, Qt
 from datetime import datetime, timedelta
 import time
 from threading import Thread, Lock
-from main_functions import save_config, get_cert_names, gather_mail, send_mail, validate_email, check_time, add_to_startup, config_path, config, EdoWindow, is_file_locked, agregate_edo_messages
+from main_functions import save_config, config_file, get_cert_names, gather_mail, send_mail, validate_email, check_time, add_to_startup, config_path, config, EdoWindow, is_file_locked, agregate_edo_messages
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
@@ -91,7 +91,6 @@ class MainWindow(QMainWindow):
         checkBox_autosend_edo = self.findChild(QCheckBox, 'checkBox_autosend_edo')
         checkBox_autosend_edo.stateChanged.connect(self.toggle_edo_autosender)
         checkBox_autosend_edo.setChecked(config['checkBox_autosend_edo'])
-
         self.plainTextEdit_log = self.findChild(QPlainTextEdit, 'plainTextEdit_log')
         pushButton_log = self.findChild(QPushButton, 'pushButton_log')
         pushButton_log.clicked.connect(lambda: os.startfile(os.path.join(config_path, 'log.log')))
@@ -130,8 +129,9 @@ class MainWindow(QMainWindow):
         self.connection_window = EdoWindow(self.config)
         res = self.connection_window.exec_()
         if res:
-            self.config = self.connection_window.config
-            save_config(self.config)
+            for k,v in self.connection_window.config.items():
+                self.config[k] = v
+            self.save_params()
 
     def hide_to_tray(self):
         self.hide()
@@ -164,7 +164,7 @@ class MainWindow(QMainWindow):
         self.config['timeEdit_connecting_delay'] = self.timeEdit_connecting_delay.time().toString('mm:ss')
         self.config['radioButton_periodic'] = self.radioButton_periodic.isChecked()
         self.config['radioButton_schedule'] = self.radioButton_schedule.isChecked()
-        save_config(self.config)
+        save_config(config_file, self.config)
 
     def send_mail_manual(self, manual):
         print('here')
