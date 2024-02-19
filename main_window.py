@@ -331,13 +331,17 @@ class MainWindow(QMainWindow):
         self.add_log_message('Все пакеты были отправлены (если они были)')
 
     def toggle_edo_autosender(self, state):
-        if state == 2:
-            self.observer.start()
-            self.add_log_message(f'Наблюдение за директорией "{self.directory_to_watch}" включено')
-        else:
-            self.observer.stop()
-            self.observer.join()
-            self.add_log_message(f'Наблюдение за директорией "{self.directory_to_watch}" выключено')
+        try:
+            if state == 2:
+                self.observer.start()
+                self.add_log_message(f'Наблюдение за директорией "{self.directory_to_watch}" включено')
+            else:
+                self.observer.stop()
+                self.observer.join()
+                self.add_log_message(f'Наблюдение за директорией "{self.directory_to_watch}" выключено')
+        except Exception as e:
+            traceback.print_exc()
+            self.add_log_message(f'Наблюдение за директорией "{self.directory_to_watch}" не удается, {e}')
 
 
 class MyHandler(FileSystemEventHandler):
