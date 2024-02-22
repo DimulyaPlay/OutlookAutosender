@@ -167,7 +167,6 @@ class MainWindow(QMainWindow):
         save_config(config_file, self.config)
 
     def send_mail_manual(self, manual):
-        print('here')
         errors = self.check_fields(manual)
         if errors:
             self.add_log_message('\n'.join(errors))
@@ -300,7 +299,6 @@ class MainWindow(QMainWindow):
             periods = self.config['lineEdit_schedule'].split(',')
             for period in periods:
                 if not check_time(period):
-                    print(period)
                     valid = False
             if not valid:
                 errors.append('Некорректно указано время в расписании')

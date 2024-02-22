@@ -87,6 +87,7 @@ def read_create_config(config_file):
             config = json.load(configfile)
             for key, value in default_configuration.items():
                 config.setdefault(key, value)
+            save_config(config_file, config)
     except:
         save_config(config_file, default_configuration)
         config = default_configuration
