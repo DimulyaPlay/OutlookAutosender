@@ -2,3 +2,5 @@ PyQt5~=5.15.10
 pywin32
 winshell~=0.6
 watchdog~=3.0.0
+pypdf2~=3.0.1
+reportlab~=4.1.0

@@ -21,9 +21,16 @@ import win32print
 import random
 import pythoncom
 from PyPDF2 import PdfReader, PdfWriter
+from reportlab.lib.pagesizes import portrait, A4
+from reportlab.pdfgen import canvas
+from reportlab.lib import colors
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from email_client import send_email
 pythoncom.CoInitialize()
 
 
+pdfmetrics.registerFont(TTFont('DejaVuSans', './UI/DejaVuSans.ttf'))
 def save_config(config_file, config):
     try:
         with open(config_file, 'w') as json_file:
@@ -72,7 +79,15 @@ def load_or_create_default_config(config_file):
         'lineedit_input_edo': '',
         'lineedit_output_edo': '',
         'lineedit_rr_address': '',
-        'checkBox_autosend_edo': False
+        'checkBox_autosend_edo': False,
+        "email_out": "",
+        "email_in": "",
+        "email_password": "",
+        "email_login": "",
+        "email_in_enc": "\u041d\u0435\u0442",
+        "email_out_enc": "\u041d\u0435\u0442",
+        "email_use_outlook": True,
+        "email_use_user": False
     }
     if not os.path.exists(config_file):
         save_config(config_file, default_configuration)
@@ -104,6 +119,7 @@ def get_cert_names(cert_mgr_path):
             output = result.stdout
         except subprocess.CalledProcessError as e:
             print(f"Ошибка выполнения команды: {e}")
+            output = ''
         subject_lines1 = re.findall(r'Субъект\s+:\s+([^\n]+)', output)
         subject_lines2 = re.findall(r'Subject\s+:\s+([^\n]+)', output)
         cn_list1 = [re.search(r'CN=([^\n]+)', line).group(1) if 'CN=' in line else '' for line in subject_lines1]
@@ -131,10 +147,10 @@ def is_file_locked(filepath):
 
 
 def split_files_into_groups(file_paths):
+    current_group_size = 0
+    current_group = []
+    all_groups = []
     try:
-        current_group_size = 0
-        current_group = []
-        all_groups = []
         for file_path in file_paths:
             file_size_mb = os.path.getsize(file_path) / (1024 ** 2)  # Размер файла в мегабайтах
             if current_group_size + file_size_mb > config['spinBox_max_attach_weight']:
@@ -211,10 +227,12 @@ def gather_mail():
 
 def agregate_edo_messages(current_filelist):
     try:
-        pythoncom.CoInitialize()
-        outlook = win32com.client.Dispatch('Outlook.Application')
-        namespace = outlook.GetNamespace('MAPI')
+        if config.get('email_use_outlook'):
+            pythoncom.CoInitialize()
+            outlook = win32com.client.Dispatch('Outlook.Application')
+            namespace = outlook.GetNamespace('MAPI')
         sent_files = []
+        by = config.get('email_login', 'Я')
         for archive in current_filelist:
             reports_found = []
             foldername_extracted = archive[:-4]
@@ -226,54 +244,93 @@ def agregate_edo_messages(current_filelist):
             with open(foldername_extracted+'\\meta.json', 'r') as metafile:
                 meta = json.load(metafile)
             subject = f'{meta["id"]}] ' + meta['subject'] if meta['subject'] else os.path.basename(archive)
+            body_text = meta['body'] + '\n' + "Список направляемых файлов:" + '\n' + "\n".join(zip_filelist)
             [os.remove(fp) for fp in glob(ReportsPrinted + "\\" + '*.pdf')]
             if meta['rr']:
                 att_enc = encode_file(archive)
-                message = outlook.CreateItem(0)
-                message.Subject = "[rr-"+subject
-                body_text = meta['body'] + '\n' + "Список направляемых файлов:" + '\n' + "\n".join(zip_filelist)
-                message.Body = body_text
-                message.Attachments.Add(att_enc)
-                os.unlink(att_enc)
-                recipient = message.Recipients.Add(config.get('lineedit_rr_address', 'no_addres'))
-                recipient.Type = 1
-                sender = namespace.CreateRecipient(namespace.CurrentUser.Address)
-                sender.Resolve()
-                message.SendUsingAccount = sender
-                message.Send()
-                sent_files.append(f'В РР отправлены файлы: {", ".join(meta["fileNames"])}')
-                pdf_report_rr = os.path.join(ReportsPrinted, f'\\rr-{meta["id"]}.pdf')
-                sf, rf = gather_report_from_sent_items(namespace, "[rr-" + subject, pdf_report_rr)
-                sent_files.extend(sf)
-                if rf:
-                    reports_found.append(pdf_report_rr)
-            if meta['emails']:
-                message = outlook.CreateItem(0)
-                message.Subject = "[eml-"+subject
-                message.Body = meta['body']
-                attachments = [os.path.join(foldername_extracted, fileName) for fileName in meta['fileNames']]
-                for att in attachments:
-                    temp_filepath = os.path.join(temp_path, os.path.basename(att))
-                    shutil.copy(att, temp_filepath)
-                    message.Attachments.Add(temp_filepath)
-                    os.unlink(temp_filepath)
-                    if config['checkBox_use_encryption']:
-                        os.unlink(att)
-                recipients = meta['emails'].split(';')
-                for r in recipients:
-                    if validate_email(r):
-                        recipient = message.Recipients.Add(r)
+                subject_rr = "[rr-"+subject
+                recipient_rr = config.get('lineedit_rr_address')
+                if config.get('email_use_outlook'):
+                    try:
+                        message = outlook.CreateItem(0)
+                        message.Subject = subject_rr
+                        message.Body = body_text
+                        message.Attachments.Add(att_enc)
+                        os.unlink(att_enc)
+                        recipient = message.Recipients.Add(recipient_rr)
                         recipient.Type = 1
-                sender = namespace.CreateRecipient(namespace.CurrentUser.Address)
-                sender.Resolve()
-                message.SendUsingAccount = sender
-                message.Send()
-                sent_files.append(f'В адреса {meta["emails"]} отправлены файлы: {", ".join(meta["fileNames"])}')
+                        sender = namespace.CreateRecipient(namespace.CurrentUser.Address)
+                        sender.Resolve()
+                        message.SendUsingAccount = sender
+                        message.Send()
+                        sent_files.append(f'В РР отправлены файлы: {", ".join(meta["fileNames"])}')
+                    except Exception as e:
+                        sent_files.append(f'Ошибка отправки в РР: {e}')
+                else:
+                    res, error = send_email(subject_rr, body_text, [att_enc], [recipient_rr], config)
+                    if not res:
+                        sent_files.append(f'В РР отправлены файлы: {", ".join(meta["fileNames"])}')
+                    else:
+                        sent_files.append(error)
+                pdf_report_rr = os.path.join(ReportsPrinted, f'\\rr-{meta["id"]}.pdf')
+                try:
+                    create_report(by,
+                                  get_timestamp(),
+                                  recipient_rr,
+                                  subject_rr,
+                                  body_text,
+                                  os.path.basename(att_enc),
+                                  pdf_report_rr)
+                    sent_files.append(f'Отчет сохранен по пути: {pdf_report_rr}')
+                    reports_found.append(pdf_report_rr)
+                except Exception as e:
+                    sent_files.append(f'Отчет не сохранен: {e}')
+            if meta['emails']:
+                subject_eml = "[eml-" + subject
+                attachments = [os.path.join(foldername_extracted, fileName) for fileName in meta['fileNames']]
+                recipients = meta['emails'].split(';')
+                recipients = [i for i in recipients if validate_email(i)]
+                if config.get('email_use_outlook'):
+                    try:
+                        message = outlook.CreateItem(0)
+                        message.Subject = subject_eml
+                        message.Body = body_text
+                        for att in attachments:
+                            temp_filepath = os.path.join(temp_path, os.path.basename(att))
+                            shutil.copy(att, temp_filepath)
+                            message.Attachments.Add(temp_filepath)
+                            os.unlink(temp_filepath)
+                            if config['checkBox_use_encryption']:
+                                os.unlink(att)
+                        for r in recipients:
+                            recipient = message.Recipients.Add(r)
+                            recipient.Type = 1
+                        sender = namespace.CreateRecipient(namespace.CurrentUser.Address)
+                        sender.Resolve()
+                        message.SendUsingAccount = sender
+                        message.Send()
+                        sent_files.append(f'В адреса {meta["emails"]} отправлены файлы: {", ".join(meta["fileNames"])}')
+                    except Exception as e:
+                        sent_files.append(f'Ошибка отправки: {e}')
+                else:
+                    res, error = send_email(subject_eml, body_text, attachments, recipients, config)
+                    if not res:
+                        sent_files.append(f'В адреса {meta["emails"]} отправлены файлы: {", ".join(meta["fileNames"])}')
+                    else:
+                        sent_files.append(error)
                 pdf_report_eml = os.path.join(ReportsPrinted, f'\\eml-{meta["id"]}.pdf')
-                sf, rf = gather_report_from_sent_items(namespace, "[eml-"+subject, pdf_report_eml)
-                sent_files.extend(sf)
-                if rf:
+                try:
+                    create_report(by,
+                                  get_timestamp(),
+                                  "\n".join(recipients),
+                                  subject_eml,
+                                  body_text,
+                                  "\n".join([os.path.basename(i) for i in attachments]),
+                                  pdf_report_eml)
+                    sent_files.append(f'Отчет сохранен по пути: {pdf_report_eml}')
                     reports_found.append(pdf_report_eml)
+                except Exception as e:
+                    sent_files.append(f'Отчет не сохранен: {e}')
             pdf_report = os.path.join(config['lineedit_output_edo'], f'\\{meta["id"]}.pdf')
             create_final_report(reports_found, pdf_report)
             shutil.rmtree(foldername_extracted)
@@ -285,7 +342,8 @@ def agregate_edo_messages(current_filelist):
         print_exc()
         return -1
     finally:
-        pythoncom.CoUninitialize()
+        if config.get('email_use_outlook'):
+            pythoncom.CoUninitialize()
 
 
 def gather_report_from_sent_items(namespace, tracked_msg_subject, pdf_report):
@@ -324,6 +382,32 @@ def gather_report_from_sent_items(namespace, tracked_msg_subject, pdf_report):
         sent_files.append(f'Но не удалось сохранить отчет об отправке: {e}')
         print_exc()
         return sent_files, False
+
+
+def create_report(by, sent_time, to, subj, body, att, pdf_report):
+    try:
+        c = canvas.Canvas(pdf_report, pagesize=portrait(A4))
+        c.setFont('DejaVuSans', 12)
+        width, height = A4
+        c.setStrokeColor(colors.black)
+        c.setLineWidth(1)
+        c.line(50, 730, width - 50, 730)
+        c.drawString(50, 710, "От:")
+        c.drawString(150, 710, by)
+        c.drawString(50, 690, "Отправлено:")
+        c.drawString(150, 690, sent_time)
+        c.drawString(50, 670, "Кому:")
+        c.drawString(150, 670, to)
+        c.drawString(50, 650, "Тема:")
+        c.drawString(150, 650, subj)
+        c.drawString(50, 630, "Вложения:")
+        c.drawString(150, 630, att)
+        c.drawString(50, 560, body)
+        c.save()
+    except:
+        print_exc()
+        return False
+    return True
 
 
 def create_final_report(filepaths_to_concat, export_filepath):
@@ -428,6 +512,16 @@ def create_shortcut(shortcut_path):
     shortcut.TargetPath = sys.argv[0]
     shortcut.WorkingDirectory = os.path.dirname(sys.argv[0])
     shortcut.save()
+
+
+def get_timestamp():
+    now = datetime.now()
+    months = [
+        'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+        'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'
+    ]
+    timestamp = f"{now.day} {months[now.month - 1]} {now.year} г., {now.hour:02d}:{now.minute:02d}"
+    return timestamp
 
 
 class EdoWindow(QDialog):

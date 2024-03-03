@@ -13,11 +13,14 @@ from threading import Thread, Lock
 from main_functions import save_config, config_file, get_cert_names, gather_mail, send_mail, validate_email, check_time, add_to_startup, config_path, config, EdoWindow, is_file_locked, agregate_edo_messages
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+from email_client import ConnectionWindow
 
 
 class MainWindow(QMainWindow):
     def __init__(self, config):
         super().__init__()
+        self.connection_window = None
+        self.edo_window = None
         ui_file = 'UI/main_2.ui'
         uic.loadUi(ui_file, self)
         icon = QIcon("UI/icons8-carrier-pigeon-64.png")
@@ -85,6 +88,8 @@ class MainWindow(QMainWindow):
         self.start_manual.clicked.connect(lambda: self.send_mail_manual(True))
         pushButto_send_edo_manual = self.findChild(QPushButton, 'pushButto_send_edo_manual')
         pushButto_send_edo_manual.clicked.connect(self.send_edo_messages)
+        pushButton_connection_settings = self.findChild(QPushButton, 'pushButton_connection_settings')
+        pushButton_connection_settings.clicked.connect(self.open_connection_settings)
         checkBox_autosend_edo = self.findChild(QCheckBox, 'checkBox_autosend_edo')
         checkBox_autosend_edo.stateChanged.connect(self.toggle_edo_autosender)
         checkBox_autosend_edo.setChecked(config['checkBox_autosend_edo'])
@@ -169,10 +174,18 @@ class MainWindow(QMainWindow):
         sys.exit(0)
 
     def open_edo_settings(self):
-        self.connection_window = EdoWindow(self.config)
+        self.edo_window = EdoWindow(self.config)
+        res = self.edo_window.exec_()
+        if res:
+            for k,v in self.edo_window.config.items():
+                self.config[k] = v
+            self.save_params()
+
+    def open_connection_settings(self):
+        self.connection_window = ConnectionWindow(self.config)
         res = self.connection_window.exec_()
         if res:
-            for k,v in self.connection_window.config.items():
+            for k, v in self.connection_window.config.items():
                 self.config[k] = v
             self.save_params()
 
