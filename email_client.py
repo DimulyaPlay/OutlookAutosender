@@ -11,9 +11,10 @@ from PyQt5.QtWidgets import QDialog, QLineEdit, QRadioButton, QWidget, QComboBox
 from PyQt5 import uic
 from PyQt5.QtGui import QIcon
 import queue
+from traceback import print_exc
 
 
-def send_email(subject: str, body: str, attachments: list, recipients: list, cfg: dict):
+def send_email_imap(subject: str, body: str, attachments: list, recipients: list, cfg: dict):
     """
     :param subject: tema str
     :param body: telo str
@@ -39,9 +40,9 @@ def send_email(subject: str, body: str, attachments: list, recipients: list, cfg
         use_ssl = cfg.get('email_out_enc', 'Нет') != 'Нет'
         port = int(port)  # Преобразование порта в число
         if use_ssl:
-            mail = smtplib.SMTP_SSL(address, port)
+            mail = smtplib.SMTP_SSL(address, port, timeout=10)
         else:
-            mail = smtplib.SMTP(address, port)
+            mail = smtplib.SMTP(address, port, timeout=10)
         mail.login(cfg['email_login'], cfg['email_password'])
         mail.sendmail(cfg['email_login'], recipients, msg.as_string())
         mail.quit()
@@ -52,26 +53,25 @@ def send_email(subject: str, body: str, attachments: list, recipients: list, cfg
         return -1, f"Ошибка при отправке тестового письма: {e}"
 
 
-def check_email(subject: str, cfg: dict):
+def check_email_imap(subject: str, cfg: dict):
     """
     :param subject: тема для поиска
     :param cfg: параметры
     :return: resultcode 0 - success -1 - error 1 - not found, comment
     """
     try:
-        imap_server, imap_port = cfg["email_in"].split(':')
+        server, port = cfg["email_in"].split(':')
         use_ssl = cfg.get('email_in_enc', 'Нет') != 'Нет'
-        imap_port = int(imap_port)
+        port = int(port)
         if use_ssl:
-            mail = imaplib.IMAP4_SSL(imap_server, imap_port)
+            mail = imaplib.IMAP4_SSL(server, port)
         else:
-            mail = imaplib.IMAP4(imap_server, imap_port)
+            mail = imaplib.IMAP4(server, port)
         mail.login(cfg["email_login"], cfg["email_password"])
         mail.select('INBOX')
         result, data = mail.search(None, 'ALL')
         if result == 'OK':
             mail_ids = data[0].split()
-            # Берем последние 10 ID писем для проверки
             last_five_mail_ids = mail_ids[-10:]
             for mail_id in last_five_mail_ids[::-1]:
                 typ, msg_data = mail.fetch(mail_id, '(RFC822)')
@@ -93,7 +93,8 @@ def email_worker(queue):
     while True:
         try:
             email_info = queue.get(timeout=3)  # Ожидание задачи в течение 3 секунд
-            send_email(email_info['subject'], email_info['body'], email_info['attachments'], email_info['recipients'])
+            send_email_imap(email_info['subject'], email_info['body'], email_info['attachments'],
+                            email_info['recipients'], )
         except queue.Empty:
             print("Очередь пуста, воркер завершает работу")
             break
@@ -143,10 +144,10 @@ class ConnectionWindow(QDialog):
         body = "Это тестовое письмо для проверки соединения."
         recipients = [self.config.get('email_login')]
         attachments = []
-        res1, message = send_email(subject, body, attachments, recipients, self.config)
+        res1, message = send_email_imap(subject, body, attachments, recipients, self.config)
         if not res1:
             time.sleep(2)
-            res2, message = check_email(subject, self.config)
+            res2, message = check_email_imap(subject, self.config)
             if not res2:
                 print('Тест подключения пройден')
                 QMessageBox.information(self, 'Успех', 'Тест подключения пройден.')
@@ -156,6 +157,3 @@ class ConnectionWindow(QDialog):
         else:
             print('Не удалось отправить письмо')
             QMessageBox.warning(self, 'Ошибка', message)
-
-
-## vefqvzadbkvizjqw

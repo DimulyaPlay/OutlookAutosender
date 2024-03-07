@@ -114,7 +114,7 @@ class MainWindow(QMainWindow):
             secs = int(mm) * 60 + int(ss)
             self.add_log_message(f'Включен автостарт, работа будет запущена через {secs} секунд')
             self.autostart_timer = QTimer(self)
-            self.autostart_timer.timeout.connect(self.switch_tasker)
+            self.autostart_timer.timeout.connect(self.toggleScheduler)
             self.autostart_timer.start(secs * 1000)
         else:
             self.show()
@@ -125,15 +125,18 @@ class MainWindow(QMainWindow):
             self.start_scheduler.setText('Запустить работу по расписанию')
             self.running = False
         else:
-            self.startScheduler()  # Запуск диспетчера
-            self.start_scheduler.setText('Остановить работу по расписанию')
-            self.running = True
+            res = self.startScheduler()  # Запуск диспетчера
+            if not res:
+                self.start_scheduler.setText('Остановить работу по расписанию')
+                self.running = True
+            else:
+                self.add_log_message('Запуск задач был отменен из-за ошибок валидации.')
 
     def startScheduler(self):
         errors = self.check_fields(False)
         if errors:
             self.add_log_message('\n'.join(errors))
-            return
+            return -1
         try:
             if self.config['checkBox_periodic']:
                 hours, minutes = self.timeEdit_send_period.time().toString('HH:mm').split(':')
@@ -155,6 +158,7 @@ class MainWindow(QMainWindow):
                     self.schedule_timers.append(timer)  # Сохраняем таймеры, чтобы они не удалялись
                     self.add_log_message(f'Таймер на {time_str} запущен.')
             self.add_log_message('Работа по расписанию запущена.')
+
         except Exception as e:
             self.add_log_message(f'Ошибка при запуске таймеров: {e}')
 

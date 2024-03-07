@@ -26,7 +26,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
-from email_client import send_email
+from email_client import send_email_imap
 pythoncom.CoInitialize()
 
 
@@ -267,7 +267,7 @@ def agregate_edo_messages(current_filelist):
                     except Exception as e:
                         sent_files.append(f'Ошибка отправки в РР: {e}')
                 else:
-                    res, error = send_email(subject_rr, body_text, [att_enc], [recipient_rr], config)
+                    res, error = send_email_imap(subject_rr, body_text, [att_enc], [recipient_rr], config)
                     if not res:
                         sent_files.append(f'В РР отправлены файлы: {", ".join(meta["fileNames"])}')
                     else:
@@ -313,7 +313,7 @@ def agregate_edo_messages(current_filelist):
                     except Exception as e:
                         sent_files.append(f'Ошибка отправки: {e}')
                 else:
-                    res, error = send_email(subject_eml, body_text, attachments, recipients, config)
+                    res, error = send_email_imap(subject_eml, body_text, attachments, recipients, config)
                     if not res:
                         sent_files.append(f'В адреса {meta["emails"]} отправлены файлы: {", ".join(meta["fileNames"])}')
                     else:
