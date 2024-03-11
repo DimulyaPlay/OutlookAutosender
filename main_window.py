@@ -129,6 +129,7 @@ class MainWindow(QMainWindow):
             if not res:
                 self.start_scheduler.setText('Остановить работу по расписанию')
                 self.running = True
+                self.autostart_timer.stop()
             else:
                 self.add_log_message('Запуск задач был отменен из-за ошибок валидации.')
 
