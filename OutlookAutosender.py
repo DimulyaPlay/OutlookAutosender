@@ -7,7 +7,7 @@ from main_window import MainWindow
 import traceback
 
 # pyinstaller --noconfirm --onedir --console --icon "C:/Users/dimas/OtpravkaRosreestr/icons8-carrier-pigeon-64.ico" --add-data "C:/Users/dimas/OtpravkaRosreestr/UI;UI" "C:/Users/dimas/OtpravkaRosreestr/OutlookAutosender.py"
-# C:/Users/CourtUser/Desktop/release/OutlookAutosender/venv/Scripts/pyinstaller.exe --noconfirm --onedir --console --windowed --icon "C:/Users/CourtUser/Desktop/release/OutlookAutosender/icons8-carrier-pigeon-64.ico" --add-data "C:/Users/CourtUser/Desktop/release/OutlookAutosender/ReportsPrinted;ReportsPrinted" --add-data "C:/Users/CourtUser/Desktop/release/OutlookAutosender/UI;UI" --add-data "C:/Users/CourtUser/Desktop/release/OutlookAutosender/readme.txt;." "C:/Users/CourtUser/Desktop/release/OutlookAutosender/OutlookAutosender.py"
+# C:/Users/CourtUser/Desktop/release/OutlookAutosender/venv/Scripts/pyinstaller.exe --noconfirm --onedir --console --icon "C:/Users/CourtUser/Desktop/release/OutlookAutosender/icons8-carrier-pigeon-64.ico" --add-data "C:/Users/CourtUser/Desktop/release/OutlookAutosender/ReportsPrinted;ReportsPrinted" --add-data "C:/Users/CourtUser/Desktop/release/OutlookAutosender/UI;UI" --add-data "C:/Users/CourtUser/Desktop/release/OutlookAutosender/readme.txt;." "C:/Users/CourtUser/Desktop/release/OutlookAutosender/OutlookAutosender.py"
 
 logging.getLogger("PyQt5").setLevel(logging.WARNING)
 log_path = os.path.join(os.path.dirname(sys.argv[0]), 'log.log')

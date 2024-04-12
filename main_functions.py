@@ -27,10 +27,11 @@ from reportlab.lib import colors
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from email_client import send_email_imap
+import textwrap
 pythoncom.CoInitialize()
 
-
 pdfmetrics.registerFont(TTFont('DejaVuSans', './UI/DejaVuSans.ttf'))
+pdfmetrics.registerFont(TTFont('DejaVuSans-Bold', './UI/DejaVuSans-Bold.ttf'))
 def save_config(config_file, config):
     try:
         with open(config_file, 'w') as json_file:
@@ -240,11 +241,11 @@ def agregate_edo_messages(current_filelist):
                 foldername_extracted = foldername_extracted + str(random.randint(1, 9999))
             with zipfile.ZipFile(archive, 'r') as zipObj:
                 zipObj.extractall(foldername_extracted)
-                zip_filelist = [f'{num+1}. {zipf.filename}' for num, zipf in enumerate(zipObj.filelist)]
+                zip_filelist = [f'{num+1}. {zipf.filename}' for num, zipf in enumerate(zipObj.filelist) if zipf.filename != 'meta.json']
             with open(foldername_extracted+'\\meta.json', 'r') as metafile:
                 meta = json.load(metafile)
             subject = f'{meta["id"]}] ' + meta['subject'] if meta['subject'] else os.path.basename(archive)
-            body_text = meta['body'] + '\n' + "Список направляемых файлов:" + '\n' + "\n".join(zip_filelist)
+            body_text = meta['body'] + '\n\n\n' + "Список направляемых файлов:" + '\n' + "\n".join(zip_filelist)
             [os.remove(fp) for fp in glob(ReportsPrinted + "\\" + '*.pdf')]
             if meta['rr']:
                 att_enc = encode_file(archive)
@@ -325,7 +326,7 @@ def agregate_edo_messages(current_filelist):
                                   "\n".join(recipients),
                                   subject_eml,
                                   body_text,
-                                  "\n".join([os.path.basename(i) for i in attachments]),
+                                  ";".join([os.path.basename(i) for i in attachments if not i.endswith('meta.json')]),
                                   pdf_report_eml)
                     sent_files.append(f'Отчет сохранен по пути: {pdf_report_eml}')
                     reports_found.append(pdf_report_eml)
@@ -334,7 +335,10 @@ def agregate_edo_messages(current_filelist):
             pdf_report = os.path.join(config['lineedit_output_edo'], f'\\{meta["id"]}.pdf')
             create_final_report(reports_found, pdf_report)
             shutil.rmtree(foldername_extracted)
-            shutil.move(archive, os.path.join(config['lineedit_input_edo'], 'sent'))
+            destination_path = os.path.join(config['lineedit_input_edo'], 'sent', os.path.basename(archive))
+            if os.path.exists(destination_path):
+                os.remove(destination_path)
+            shutil.move(archive, destination_path)
         if not sent_files:
             return 0
         return '\n'.join(sent_files)
@@ -384,25 +388,66 @@ def gather_report_from_sent_items(namespace, tracked_msg_subject, pdf_report):
         return sent_files, False
 
 
-def create_report(by, sent_time, to, subj, body, att, pdf_report):
+def create_report(by, sent_time, to, subject, body, att, pdf_report) -> object:
+    """
+    Создание из msg файла отдельного pdf документа(для печати не через outlook)
+    Генерирует word документ по шаблону, затем конвертирует в pdf
+    @param msg_path: путь к мсг
+    @return: путь к пдф
+    """
     try:
-        c = canvas.Canvas(pdf_report, pagesize=portrait(A4))
-        c.setFont('DejaVuSans', 12)
-        width, height = A4
-        c.setStrokeColor(colors.black)
-        c.setLineWidth(1)
-        c.line(50, 730, width - 50, 730)
-        c.drawString(50, 710, "От:")
-        c.drawString(150, 710, by)
-        c.drawString(50, 690, "Отправлено:")
-        c.drawString(150, 690, sent_time)
-        c.drawString(50, 670, "Кому:")
-        c.drawString(150, 670, to)
-        c.drawString(50, 650, "Тема:")
-        c.drawString(150, 650, subj)
-        c.drawString(50, 630, "Вложения:")
-        c.drawString(150, 630, att)
-        c.drawString(50, 560, body)
+        max_line_length = 75
+        subject_lines = textwrap.wrap(subject, max_line_length)
+        res_date = sent_time
+        rec_str = to
+        rec_lines = textwrap.wrap(rec_str, max_line_length)
+        att_str = att
+        att_lines = textwrap.wrap(att_str, max_line_length)
+        att_lines = att_lines if att_lines else ['Вложений нет']
+        sender_str = by
+        body_text = body
+        pdf_path = pdf_report
+        c = canvas.Canvas(pdf_path, pagesize=A4)
+        c.setFont("DejaVuSans-Bold", 8)
+        x_offset = 25
+        x_offset_val = 100
+        y_current = 800
+        c.setFont("DejaVuSans-Bold", 8)
+        c.drawString(x_offset, y_current, "От:")
+        c.setFont("DejaVuSans", 8)
+        c.drawString(x_offset_val, y_current, sender_str)
+        y_current -= 14
+        c.setFont("DejaVuSans-Bold", 8)
+        c.drawString(x_offset, y_current, "Отправлено:")
+        c.setFont("DejaVuSans", 8)
+        c.drawString(x_offset_val, y_current, res_date)
+        y_current -= 14
+        c.setFont("DejaVuSans-Bold", 8)
+        c.drawString(x_offset, y_current, "Кому:")
+        c.setFont("DejaVuSans", 8)
+        for line in rec_lines:
+            c.drawString(x_offset_val, y_current, line)
+            y_current -= 14
+        c.setFont("DejaVuSans-Bold", 8)
+        c.drawString(x_offset, y_current, "Тема:")
+        c.setFont("DejaVuSans", 8)
+        for line in subject_lines:
+            c.drawString(x_offset_val, y_current, line)
+            y_current -= 14
+        c.setFont("DejaVuSans-Bold", 8)
+        c.drawString(x_offset, y_current, "Вложения:")
+        c.setFont("DejaVuSans", 8)
+        for line in att_lines:
+            c.drawString(x_offset_val, y_current, line)
+            y_current -= 14
+        c.setFont("DejaVuSans-Bold", 8)
+        c.drawString(x_offset, y_current, "Тело письма:")
+        c.setFont("DejaVuSans", 8)
+        y_current -= 18
+        text_object = c.beginText(x_offset, y_current)
+        text_object.setTextOrigin(x_offset, y_current)
+        text_object.textLines(body_text)
+        c.drawText(text_object)
         c.save()
     except:
         print_exc()

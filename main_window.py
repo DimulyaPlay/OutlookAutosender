@@ -14,6 +14,7 @@ from main_functions import save_config, config_file, get_cert_names, gather_mail
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from email_client import ConnectionWindow
+from glob import glob
 
 
 class MainWindow(QMainWindow):
@@ -159,7 +160,7 @@ class MainWindow(QMainWindow):
                     self.schedule_timers.append(timer)  # Сохраняем таймеры, чтобы они не удалялись
                     self.add_log_message(f'Таймер на {time_str} запущен.')
             self.add_log_message('Работа по расписанию запущена.')
-
+            return 0
         except Exception as e:
             self.add_log_message(f'Ошибка при запуске таймеров: {e}')
 
@@ -294,7 +295,7 @@ class MainWindow(QMainWindow):
                 errors.append('Некорректный путь для отправленных ЭДО')
         return errors
 
-    def send_edo_messages(self, file_list):
+    def send_edo_messages(self, file_list = None):
         self.add_log_message('Начинается отправка пакетов СО ЕД')
         if not os.path.isdir(self.config['lineedit_input_edo']):
             self.add_log_message('Некорректный путь для исходящих СО ЭД')
@@ -303,6 +304,8 @@ class MainWindow(QMainWindow):
             self.add_log_message('Некорректный путь для отправленных СО ЭД')
             return
         if self.config.get('checkbox_use_edo', False):
+            if not file_list:
+                file_list = glob(self.config['lineedit_input_edo']+'\\*.zip')
             res = agregate_edo_messages(file_list)
             if isinstance(res, str):
                 self.add_log_message(f'Эл. письма из СО ЭД отправлены')
