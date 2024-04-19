@@ -10,7 +10,7 @@ from PyQt5.QtCore import QTimer, QDateTime, QTime, Qt
 from datetime import datetime, timedelta
 import time
 from threading import Thread, Lock
-from main_functions import save_config, config_file, get_cert_names, gather_mail, send_mail, validate_email, check_time, add_to_startup, config_path, config, EdoWindow, is_file_locked, agregate_edo_messages
+from main_functions import save_config, config_file, get_cert_names, gather_mail, send_mail, validate_email, check_time, add_to_startup, monitor_incoming_emails, add_topic_for_search, topics_queue, config_path, config, EdoWindow, is_file_locked, agregate_edo_messages
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from email_client import ConnectionWindow
@@ -110,6 +110,11 @@ class MainWindow(QMainWindow):
         self.autostart_timer.timeout.connect(self.toggleScheduler)
         if config['checkBox_autosend_edo']:
             self.toggle_edo_autosender(2)
+            try:
+                Thread(target=monitor_incoming_emails, args=(topics_queue, config['lineedit_output_edo']), daemon=True).start()
+                self.add_log_message('Мониторинг входящих писем запущен')
+            except Exception as e:
+                self.add_log_message(f'Не удалось запустить мониторинг входящих: {e}')
         if config['checkBox_autorun'] and config['checkBox_autostart']:
             mm, ss = config['timeEdit_connecting_delay'].split(':')
             secs = int(mm) * 60 + int(ss)
@@ -362,7 +367,6 @@ class MyHandler(FileSystemEventHandler):
     def on_moved(self, event):
         super().on_moved(event)
         if not event.is_directory:
-            src_path = event.src_path
             dest_path = event.dest_path
             if dest_path.endswith('.zip'):
                 self.add_file(dest_path)

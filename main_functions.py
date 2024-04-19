@@ -28,16 +28,21 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from email_client import send_email_imap
 import textwrap
+from queue import Queue
 pythoncom.CoInitialize()
 
 pdfmetrics.registerFont(TTFont('DejaVuSans', './UI/DejaVuSans.ttf'))
 pdfmetrics.registerFont(TTFont('DejaVuSans-Bold', './UI/DejaVuSans-Bold.ttf'))
+topics_queue = Queue()
+
+
 def save_config(config_file, config):
     try:
         with open(config_file, 'w') as json_file:
             json.dump(config, json_file)
     except:
         print_exc()
+
 
 config_path = os.path.dirname(sys.argv[0])
 temp_path = os.path.join(config_path, 'temp')
@@ -245,6 +250,7 @@ def agregate_edo_messages(current_filelist):
             with open(foldername_extracted+'\\meta.json', 'r') as metafile:
                 meta = json.load(metafile)
             subject = f'{meta["id"]}] ' + meta['subject'] if meta['subject'] else os.path.basename(archive)
+            subject_for_search = f'[rr-{meta["id"]}]'
             body_text = meta['body'] + '\n\n\n' + "Список направляемых файлов:" + '\n' + "\n".join(zip_filelist)
             [os.remove(fp) for fp in glob(ReportsPrinted + "\\" + '*.pdf')]
             if meta['rr']:
@@ -264,6 +270,7 @@ def agregate_edo_messages(current_filelist):
                         sender.Resolve()
                         message.SendUsingAccount = sender
                         message.Send()
+                        add_topic_for_search(subject_for_search)
                         sent_files.append(f'В РР отправлены файлы: {", ".join(meta["fileNames"])}')
                     except Exception as e:
                         sent_files.append(f'Ошибка отправки в РР: {e}')
@@ -288,6 +295,7 @@ def agregate_edo_messages(current_filelist):
                     sent_files.append(f'Отчет не сохранен: {e}')
             if meta['emails']:
                 subject_eml = "[eml-" + subject
+                subject_for_search = f'[eml-{meta["id"]}]'
                 attachments = [os.path.join(foldername_extracted, fileName) for fileName in meta['fileNames']]
                 recipients = meta['emails'].split(';')
                 recipients = [i for i in recipients if validate_email(i)]
@@ -310,6 +318,7 @@ def agregate_edo_messages(current_filelist):
                         sender.Resolve()
                         message.SendUsingAccount = sender
                         message.Send()
+                        add_topic_for_search(subject_for_search)
                         sent_files.append(f'В адреса {meta["emails"]} отправлены файлы: {", ".join(meta["fileNames"])}')
                     except Exception as e:
                         sent_files.append(f'Ошибка отправки: {e}')
@@ -596,3 +605,40 @@ class EdoWindow(QDialog):
             self.config[lineEdit_name] = lineEdit.text()
         checkBox = self.findChild(QCheckBox, 'checkbox_use_edo')
         self.config['checkbox_use_edo'] = checkBox.isChecked()
+
+
+def monitor_incoming_emails(topics_queue, folder_to_save):
+    pythoncom.CoInitialize()
+    outlook = win32com.client.Dispatch("Outlook.Application").GetNamespace("MAPI")
+    inbox = outlook.GetDefaultFolder(6)
+
+    while True:
+        topics_with_expiry = []
+        while not topics_queue.empty():
+            topics_with_expiry.append(topics_queue.get())
+        if topics_with_expiry:
+            emails = inbox.Items
+            emails.Sort("[ReceivedTime]", True)  # Сортировка писем по времени получения, новые первые
+            latest_emails = [email for email in emails][:10]  # Берем только первые 10 писем
+            for topic, expiry in topics_with_expiry:
+                if time.time() > expiry:
+                    continue  # Пропускаем темы, время ожидания которых истекло
+                found_email = False
+                for email in latest_emails:
+                    if topic in email.Subject:
+                        found_email = True
+                        try:
+                            pdf_report_path = os.path.join(folder_to_save, f"{topic}_reply.pdf")
+                            create_report(email.SenderName, str(email.ReceivedTime), email.To, email.Subject, email.Body,
+                                          None, pdf_report_path)
+                            break  # Выход из цикла после обработки
+                        except Exception as e:
+                            print(f"Не удалось сохранить письмо: {str(e)}")
+                if not found_email and time.time() <= expiry:
+                    topics_queue.put((topic, expiry))  # Возвращаем необработанные темы в очередь для следующей проверки
+        time.sleep(10)  # Пауза 10 секунд перед следующим циклом проверки
+
+
+def add_topic_for_search(topic):
+    expiry = time.time() + 60  # Устанавливаем таймаут в 2 минуты
+    topics_queue.put((topic, expiry))
