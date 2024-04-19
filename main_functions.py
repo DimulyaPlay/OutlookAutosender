@@ -628,7 +628,7 @@ def monitor_incoming_emails(topics_queue, folder_to_save):
                     if topic in email.Subject:
                         found_email = True
                         try:
-                            pdf_report_path = os.path.join(folder_to_save, f"{topic}_reply.pdf")
+                            pdf_report_path = os.path.join(folder_to_save, f"{topic}.reply.pdf")
                             create_report(email.SenderName, str(email.ReceivedTime), email.To, email.Subject, email.Body,
                                           None, pdf_report_path)
                             break  # Выход из цикла после обработки
