@@ -21,16 +21,8 @@ import win32print
 import random
 import pythoncom
 from PyPDF2 import PdfReader, PdfWriter
-from reportlab.lib.pagesizes import portrait, A4
-from reportlab.pdfgen import canvas
-from reportlab.lib import colors
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-from email_client import send_email_imap
-pythoncom.CoInitialize()
 
 
-pdfmetrics.registerFont(TTFont('DejaVuSans', './UI/DejaVuSans.ttf'))
 def save_config(config_file, config):
     try:
         with open(config_file, 'w') as json_file:
@@ -51,6 +43,7 @@ ReportsPrinted = os.path.join(config_path, 'ReportsPrinted')
 if not os.path.exists(ReportsPrinted):
     os.mkdir(ReportsPrinted)
 config_file = os.path.join(config_path, 'config.json')
+PROCESSED_ITEMS_FILE = os.path.join(config_path, 'saved_msg.txt')
 
 
 def load_or_create_default_config(config_file):
@@ -80,14 +73,6 @@ def load_or_create_default_config(config_file):
         'lineedit_output_edo': '',
         'lineedit_rr_address': '',
         'checkBox_autosend_edo': False,
-        "email_out": "",
-        "email_in": "",
-        "email_password": "",
-        "email_login": "",
-        "email_in_enc": "\u041d\u0435\u0442",
-        "email_out_enc": "\u041d\u0435\u0442",
-        "email_use_outlook": True,
-        "email_use_user": False
     }
     if not os.path.exists(config_file):
         save_config(config_file, default_configuration)
@@ -227,14 +212,11 @@ def gather_mail():
 
 def agregate_edo_messages(current_filelist):
     try:
-        if config.get('email_use_outlook'):
-            pythoncom.CoInitialize()
-            outlook = win32com.client.Dispatch('Outlook.Application')
-            namespace = outlook.GetNamespace('MAPI')
+        pythoncom.CoInitialize()
+        outlook = win32com.client.Dispatch('Outlook.Application')
+        namespace = outlook.GetNamespace('MAPI')
         sent_files = []
-        by = config.get('email_login', 'Я')
         for archive in current_filelist:
-            reports_found = []
             foldername_extracted = archive[:-4]
             if os.path.exists(foldername_extracted):
                 foldername_extracted = foldername_extracted + str(random.randint(1, 9999))
@@ -243,98 +225,54 @@ def agregate_edo_messages(current_filelist):
                 zip_filelist = [f'{num+1}. {zipf.filename}' for num, zipf in enumerate(zipObj.filelist)]
             with open(foldername_extracted+'\\meta.json', 'r') as metafile:
                 meta = json.load(metafile)
-            subject = f'{meta["id"]}] ' + meta['subject'] if meta['subject'] else os.path.basename(archive)
+            subject = f'-{meta["id"]}] {meta["subject"]}' if meta['subject'] else f'-{meta["id"]}] {os.path.basename(archive)}'
             body_text = meta['body'] + '\n' + "Список направляемых файлов:" + '\n' + "\n".join(zip_filelist)
             [os.remove(fp) for fp in glob(ReportsPrinted + "\\" + '*.pdf')]
             if meta['rr']:
                 att_enc = encode_file(archive)
-                subject_rr = "[rr-"+subject
+                subject_rr = f"[rr-{meta['thread']}{subject}"
                 recipient_rr = config.get('lineedit_rr_address')
-                if config.get('email_use_outlook'):
-                    try:
-                        message = outlook.CreateItem(0)
-                        message.Subject = subject_rr
-                        message.Body = body_text
-                        message.Attachments.Add(att_enc)
-                        os.unlink(att_enc)
-                        recipient = message.Recipients.Add(recipient_rr)
-                        recipient.Type = 1
-                        sender = namespace.CreateRecipient(namespace.CurrentUser.Address)
-                        sender.Resolve()
-                        message.SendUsingAccount = sender
-                        message.Send()
-                        sent_files.append(f'В РР отправлены файлы: {", ".join(meta["fileNames"])}')
-                    except Exception as e:
-                        sent_files.append(f'Ошибка отправки в РР: {e}')
-                else:
-                    res, error = send_email_imap(subject_rr, body_text, [att_enc], [recipient_rr], config)
-                    if not res:
-                        sent_files.append(f'В РР отправлены файлы: {", ".join(meta["fileNames"])}')
-                    else:
-                        sent_files.append(error)
-                pdf_report_rr = os.path.join(ReportsPrinted, f'\\rr-{meta["id"]}.pdf')
                 try:
-                    create_report(by,
-                                  get_timestamp(),
-                                  recipient_rr,
-                                  subject_rr,
-                                  body_text,
-                                  os.path.basename(att_enc),
-                                  pdf_report_rr)
-                    sent_files.append(f'Отчет сохранен по пути: {pdf_report_rr}')
-                    reports_found.append(pdf_report_rr)
+                    message = outlook.CreateItem(0)
+                    message.Subject = subject_rr
+                    message.Body = body_text
+                    message.Attachments.Add(att_enc)
+                    os.unlink(att_enc)
+                    recipient = message.Recipients.Add(recipient_rr)
+                    recipient.Type = 1
+                    sender = namespace.CreateRecipient(namespace.CurrentUser.Address)
+                    sender.Resolve()
+                    message.SendUsingAccount = sender
+                    message.Send()
+                    sent_files.append(f'В РР отправлены файлы: {", ".join(meta["fileNames"])}')
                 except Exception as e:
-                    sent_files.append(f'Отчет не сохранен: {e}')
+                    sent_files.append(f'Ошибка отправки в РР: {e}')
             if meta['emails']:
-                subject_eml = "[eml-" + subject
+                subject_eml = f"[tid-{meta['thread']}{subject}"
                 attachments = [os.path.join(foldername_extracted, fileName) for fileName in meta['fileNames']]
                 recipients = meta['emails'].split(';')
-                recipients = [i for i in recipients if validate_email(i)]
-                if config.get('email_use_outlook'):
-                    try:
-                        message = outlook.CreateItem(0)
-                        message.Subject = subject_eml
-                        message.Body = body_text
-                        for att in attachments:
-                            temp_filepath = os.path.join(temp_path, os.path.basename(att))
-                            shutil.copy(att, temp_filepath)
-                            message.Attachments.Add(temp_filepath)
-                            os.unlink(temp_filepath)
-                            if config['checkBox_use_encryption']:
-                                os.unlink(att)
-                        for r in recipients:
-                            recipient = message.Recipients.Add(r)
-                            recipient.Type = 1
-                        sender = namespace.CreateRecipient(namespace.CurrentUser.Address)
-                        sender.Resolve()
-                        message.SendUsingAccount = sender
-                        message.Send()
-                        sent_files.append(f'В адреса {meta["emails"]} отправлены файлы: {", ".join(meta["fileNames"])}')
-                    except Exception as e:
-                        sent_files.append(f'Ошибка отправки: {e}')
-                else:
-                    res, error = send_email_imap(subject_eml, body_text, attachments, recipients, config)
-                    if not res:
-                        sent_files.append(f'В адреса {meta["emails"]} отправлены файлы: {", ".join(meta["fileNames"])}')
-                    else:
-                        sent_files.append(error)
-                pdf_report_eml = os.path.join(ReportsPrinted, f'\\eml-{meta["id"]}.pdf')
                 try:
-                    create_report(by,
-                                  get_timestamp(),
-                                  "\n".join(recipients),
-                                  subject_eml,
-                                  body_text,
-                                  "\n".join([os.path.basename(i) for i in attachments]),
-                                  pdf_report_eml)
-                    sent_files.append(f'Отчет сохранен по пути: {pdf_report_eml}')
-                    reports_found.append(pdf_report_eml)
+                    message = outlook.CreateItem(0)
+                    message.Subject = subject_eml
+                    message.Body = body_text
+                    for att in attachments:
+                        temp_filepath = os.path.join(temp_path, os.path.basename(att))
+                        shutil.copy(att, temp_filepath)
+                        message.Attachments.Add(temp_filepath)
+                        os.unlink(temp_filepath)
+                        if config['checkBox_use_encryption']:
+                            os.unlink(att)
+                    for r in recipients:
+                        recipient = message.Recipients.Add(r)
+                        recipient.Type = 1
+                    message.Send()
+                    sent_files.append(f'В адреса {meta["emails"]} отправлены файлы: {", ".join(meta["fileNames"])}')
                 except Exception as e:
-                    sent_files.append(f'Отчет не сохранен: {e}')
-            pdf_report = os.path.join(config['lineedit_output_edo'], f'\\{meta["id"]}.pdf')
-            create_final_report(reports_found, pdf_report)
+                    sent_files.append(f'Ошибка отправки: {e}')
+                pdf_report = os.path.join(config['lineedit_output_edo'], f'report-{meta["thread"]}-{meta["id"]}-eml.msg')
+                sent_files.extend(gather_report_from_sent_items(namespace, subject_eml, pdf_report))
             shutil.rmtree(foldername_extracted)
-            shutil.move(archive, os.path.join(config['lineedit_input_edo'], 'sent'))
+            shutil.move(archive, os.path.join(config['lineedit_input_edo'], 'sent', os.path.basename(archive)))
         if not sent_files:
             return 0
         return '\n'.join(sent_files)
@@ -342,89 +280,76 @@ def agregate_edo_messages(current_filelist):
         print_exc()
         return -1
     finally:
-        if config.get('email_use_outlook'):
-            pythoncom.CoUninitialize()
+        pythoncom.CoUninitialize()
 
 
-def gather_report_from_sent_items(namespace, tracked_msg_subject, pdf_report):
+def gather_report_from_sent_items(namespace, tracked_msg_subject, msg_report):
     sent_files = []
     try:
         sent_message = None
-        report_found = False
-        timeout = time.time() + 30  # Ждем не более 30 секунд
+        timeout = time.time() + 40  # Ждем не более 40 секунд
         while not sent_message and time.time() < timeout:
-            sent_folder = namespace.GetDefaultFolder(5)
-            sorted_items = sorted(sent_folder.Items, key=lambda x: x.CreationTime, reverse=True)
-            for item in sorted_items[:5]:
-                if item.Subject == tracked_msg_subject:
-                    sent_message = item
-                    break
+            try:
+                sent_folder = namespace.GetDefaultFolder(5)  # Папка "Отправленные"
+                items = list(sent_folder.Items)
+                sorted_items = sorted(items, key=lambda x: x.CreationTime, reverse=True)
+                for item in sorted_items[:5]:
+                    if item.Subject == tracked_msg_subject:
+                        sent_message = item
+                        break
+            except Exception as e:
+                sent_files.append(f'Ошибка при поиске сообщения: {e}')
+                print_exc()
             time.sleep(1)
         if sent_message:
-            printer_name = 'PDF24EDO'
-            default_printer = win32print.GetDefaultPrinter()
-            if default_printer != printer_name:
-                win32print.SetDefaultPrinter(printer_name)
-            sent_message.PrintOut()
-            win32print.SetDefaultPrinter(default_printer)
-            while not report_found:
-                flist = glob(ReportsPrinted + "\\" + '*.pdf')
-                for f in flist:
-                    if not is_file_locked(f):
-                        shutil.move(f, pdf_report)
-                        report_found = True
-            sent_files.append(f'Отчет об отправке сохранен по пути {pdf_report}')
-            return sent_files, report_found
+            try:
+                sent_message.SaveAs(msg_report)
+                sent_files.append(f'Отчет об отправке сохранен по пути {msg_report}')
+            except Exception as e:
+                sent_files.append(f'Не удалось сохранить отчет об отправке: {e}')
+                print_exc()
         else:
             sent_files.append(f'Истекло время ожидания появления письма в папке отправленных.')
-            return sent_files, report_found
     except Exception as e:
-        sent_files.append(f'Но не удалось сохранить отчет об отправке: {e}')
+        sent_files.append(f'Общая ошибка: {e}')
         print_exc()
-        return sent_files, False
+    return sent_files
 
 
-def create_report(by, sent_time, to, subj, body, att, pdf_report):
+def check_inbox_for_responses(namespace, config, stop_event):
+    processed_items = load_processed_items()
     try:
-        c = canvas.Canvas(pdf_report, pagesize=portrait(A4))
-        c.setFont('DejaVuSans', 12)
-        width, height = A4
-        c.setStrokeColor(colors.black)
-        c.setLineWidth(1)
-        c.line(50, 730, width - 50, 730)
-        c.drawString(50, 710, "От:")
-        c.drawString(150, 710, by)
-        c.drawString(50, 690, "Отправлено:")
-        c.drawString(150, 690, sent_time)
-        c.drawString(50, 670, "Кому:")
-        c.drawString(150, 670, to)
-        c.drawString(50, 650, "Тема:")
-        c.drawString(150, 650, subj)
-        c.drawString(50, 630, "Вложения:")
-        c.drawString(150, 630, att)
-        c.drawString(50, 560, body)
-        c.save()
-    except:
-        print_exc()
-        return False
-    return True
+        inbox_folder = namespace.GetDefaultFolder(6)  # Папка "Входящие"
+        items = inbox_folder.Items
+        items.Sort("[ReceivedTime]", True)  # Сортировка по времени получения
+        pattern = r'.*\[tid-(\d+)-(\d+)\].*'  # Паттерн для поиска
+        for i in range(1, min(21, len(items) + 1)):  # Ограничение до 20 элементов
+            if stop_event.is_set():
+                break
+            item = items.Item(i)
+            if item.EntryID not in processed_items:
+                match = re.search(pattern, item.Subject)
+                if match:
+                    print(f'Найдено сообщение с паттерном: {item.Subject}')
+                    thread_id = match.group(1)
+                    unique_id = match.group(2)
+                    pattern_extracted = f'{thread_id}-{unique_id}'
+                    msg_response = os.path.join(config['lineedit_output_edo'], f'response-{pattern_extracted}-eml.msg')
+                    try:
+                        item.SaveAs(msg_response)
+                        print(f'Сообщение сохранено по пути: {msg_response}')
+                    except Exception as e:
+                        print(f'Не удалось сохранить сообщение: {e}')
+                    processed_items.add(item.EntryID)
+                    save_processed_items(processed_items)  # Обновляем файл после добавления нового сообщения
+    except Exception as e:
+        print(f'Ошибка при мониторинге папки входящих: {e}')
 
 
-def create_final_report(filepaths_to_concat, export_filepath):
-    if filepaths_to_concat:
-        if len(filepaths_to_concat)>1:
-            writer = PdfWriter()
-
-            for filepath in filepaths_to_concat:
-                reader = PdfReader(filepath)
-                for page in reader.pages:
-                    writer.add_page(page)
-
-            with open(export_filepath, 'wb') as f:
-                writer.write(f)
-        else:
-            shutil.move(filepaths_to_concat[0], export_filepath)
-
+def monitor_inbox_periodically(namespace, config, interval, stop_event):
+    while not stop_event.is_set():
+        check_inbox_for_responses(namespace, config, stop_event)
+        stop_event.wait(interval)  # Используем wait с таймаутом вместо time.sleep
 
 def send_mail(attachments, manual=True):
     recipients = config['lineEdit_recipients'].split(";")
@@ -522,6 +447,19 @@ def get_timestamp():
     ]
     timestamp = f"{now.day} {months[now.month - 1]} {now.year} г., {now.hour:02d}:{now.minute:02d}"
     return timestamp
+
+
+def load_processed_items():
+    if not os.path.exists(PROCESSED_ITEMS_FILE):
+        return set()
+    with open(PROCESSED_ITEMS_FILE, 'r') as f:
+        return set(line.strip() for line in f)
+
+
+def save_processed_items(processed_items):
+    with open(PROCESSED_ITEMS_FILE, 'w') as f:
+        for item in processed_items:
+            f.write(f"{item}\n")
 
 
 class EdoWindow(QDialog):

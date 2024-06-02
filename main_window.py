@@ -1,3 +1,4 @@
+import glob
 import sys
 import os
 import traceback
@@ -9,16 +10,19 @@ from PyQt5 import uic, QtCore
 from PyQt5.QtCore import QTimer, QDateTime, QTime, Qt
 from datetime import datetime, timedelta
 import time
-from threading import Thread, Lock
-from main_functions import save_config, config_file, get_cert_names, gather_mail, send_mail, validate_email, check_time, add_to_startup, config_path, config, EdoWindow, is_file_locked, agregate_edo_messages
+from threading import Thread, Lock, Event
+from main_functions import save_config, config_file, get_cert_names, gather_mail, send_mail, validate_email, check_time, add_to_startup, config_path, config, EdoWindow, is_file_locked, agregate_edo_messages, monitor_inbox_periodically
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
-from email_client import ConnectionWindow
+import pythoncom
+import win32com.client
 
 
 class MainWindow(QMainWindow):
     def __init__(self, config):
         super().__init__()
+        self.monitor_inbox_thread = None
+        self.stop_event = Event()
         self.connection_window = None
         self.edo_window = None
         ui_file = 'UI/main_2.ui'
@@ -89,7 +93,7 @@ class MainWindow(QMainWindow):
         pushButto_send_edo_manual = self.findChild(QPushButton, 'pushButto_send_edo_manual')
         pushButto_send_edo_manual.clicked.connect(self.send_edo_messages)
         pushButton_connection_settings = self.findChild(QPushButton, 'pushButton_connection_settings')
-        pushButton_connection_settings.clicked.connect(self.open_connection_settings)
+        pushButton_connection_settings.setEnabled(False)
         checkBox_autosend_edo = self.findChild(QCheckBox, 'checkBox_autosend_edo')
         checkBox_autosend_edo.stateChanged.connect(self.toggle_edo_autosender)
         checkBox_autosend_edo.setChecked(config['checkBox_autosend_edo'])
@@ -182,14 +186,6 @@ class MainWindow(QMainWindow):
         res = self.edo_window.exec_()
         if res:
             for k,v in self.edo_window.config.items():
-                self.config[k] = v
-            self.save_params()
-
-    def open_connection_settings(self):
-        self.connection_window = ConnectionWindow(self.config)
-        res = self.connection_window.exec_()
-        if res:
-            for k, v in self.connection_window.config.items():
                 self.config[k] = v
             self.save_params()
 
@@ -302,6 +298,11 @@ class MainWindow(QMainWindow):
             self.add_log_message('Некорректный путь для отправленных СО ЭД')
             return
         if self.config.get('checkbox_use_edo', False):
+            if not file_list:
+                file_list = glob.glob(self.config['lineedit_input_edo']+'\\*.zip')
+                if not file_list:
+                    self.add_log_message(f'Писем не обнаружено')
+                    return
             res = agregate_edo_messages(file_list)
             if isinstance(res, str):
                 self.add_log_message(f'Эл. письма из СО ЭД отправлены')
@@ -316,15 +317,30 @@ class MainWindow(QMainWindow):
         try:
             if state == 2:
                 self.observer.start()
-                self.add_log_message(f'Наблюдение за директорией "{self.directory_to_watch}" включено')
+                # Создаем и запускаем поток для периодического мониторинга входящих сообщений
+                self.stop_event.clear()
+                self.monitor_inbox_thread = Thread(target=self.run_monitor_inbox, daemon=True)
+                self.monitor_inbox_thread.start()
+                self.add_log_message(f'Наблюдение за директорией "{self.directory_to_watch}" и мониторинг входящих включены')
             else:
                 self.observer.stop()
                 self.observer.join()
                 self.add_log_message(f'Наблюдение за директорией "{self.directory_to_watch}" выключено')
+                self.stop_event.set()
+                if self.monitor_inbox_thread is not None:
+                    self.monitor_inbox_thread.join()
+                self.add_log_message(f'Наблюдение за директорией "{self.directory_to_watch}" и мониторинг входящих включены')
+
         except Exception as e:
             traceback.print_exc()
             self.add_log_message(f'Наблюдение за директорией "{self.directory_to_watch}" не удается, {e}')
 
+    def run_monitor_inbox(self):
+        pythoncom.CoInitialize()
+        outlook = win32com.client.Dispatch('Outlook.Application')
+        namespace = outlook.GetNamespace('MAPI')
+        monitor_inbox_periodically(namespace, config, 60, self.stop_event)
+        pythoncom.CoUninitialize()
 
 class MyHandler(FileSystemEventHandler):
     def __init__(self, main_window):
@@ -361,4 +377,5 @@ class MyHandler(FileSystemEventHandler):
             src_path = event.src_path
             dest_path = event.dest_path
             if dest_path.endswith('.zip'):
+                print(dest_path)
                 self.add_file(dest_path)
