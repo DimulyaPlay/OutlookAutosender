@@ -21,6 +21,7 @@ import win32print
 import random
 import pythoncom
 from PyPDF2 import PdfReader, PdfWriter
+from uuid import uuid4
 
 
 def save_config(config_file, config):
@@ -222,11 +223,11 @@ def agregate_edo_messages(current_filelist):
                 foldername_extracted = foldername_extracted + str(random.randint(1, 9999))
             with zipfile.ZipFile(archive, 'r') as zipObj:
                 zipObj.extractall(foldername_extracted)
-                zip_filelist = [f'{num+1}. {zipf.filename}' for num, zipf in enumerate(zipObj.filelist)]
+                zip_filelist = [f'{num+1}. {zipf.filename}' for num, zipf in enumerate(zipObj.filelist) if zipf.filename != 'meta.json']
             with open(foldername_extracted+'\\meta.json', 'r') as metafile:
                 meta = json.load(metafile)
             subject = f'-{meta["id"]}] {meta["subject"]}' if meta['subject'] else f'-{meta["id"]}] {os.path.basename(archive)}'
-            body_text = meta['body'] + '\n' + "Список направляемых файлов:" + '\n' + "\n".join(zip_filelist)
+            body_text = meta['body'] + '\n' + "Список направляемых файлов:" + '\n\n' + "\n".join(zip_filelist)
             [os.remove(fp) for fp in glob(ReportsPrinted + "\\" + '*.pdf')]
             if meta['rr']:
                 att_enc = encode_file(archive)
@@ -253,8 +254,8 @@ def agregate_edo_messages(current_filelist):
                 recipients = meta['emails'].split(';')
                 try:
                     message = outlook.CreateItem(0)
-                    message.Subject = subject_eml
-                    message.Body = body_text
+                    message.Subject = u"{}".format(subject_eml)
+                    message.Body = u"{}".format(body_text)
                     for att in attachments:
                         temp_filepath = os.path.join(temp_path, os.path.basename(att))
                         shutil.copy(att, temp_filepath)
@@ -269,7 +270,7 @@ def agregate_edo_messages(current_filelist):
                     sent_files.append(f'В адреса {meta["emails"]} отправлены файлы: {", ".join(meta["fileNames"])}')
                 except Exception as e:
                     sent_files.append(f'Ошибка отправки: {e}')
-                pdf_report = os.path.join(config['lineedit_output_edo'], f'report-{meta["thread"]}-{meta["id"]}-eml.msg')
+                pdf_report = os.path.join(config['lineedit_output_edo'], f'report-{meta["thread"]}-{meta["id"]}-eml.zip')
                 sent_files.extend(gather_report_from_sent_items(namespace, subject_eml, pdf_report))
             shutil.rmtree(foldername_extracted)
             shutil.move(archive, os.path.join(config['lineedit_input_edo'], 'sent', os.path.basename(archive)))
@@ -291,9 +292,10 @@ def gather_report_from_sent_items(namespace, tracked_msg_subject, msg_report):
         while not sent_message and time.time() < timeout:
             try:
                 sent_folder = namespace.GetDefaultFolder(5)  # Папка "Отправленные"
-                items = list(sent_folder.Items)
-                sorted_items = sorted(items, key=lambda x: x.CreationTime, reverse=True)
-                for item in sorted_items[:5]:
+                items = sent_folder.Items
+                items.Sort("[SentOn]", True)  # Сортировка по времени отправки
+                for i in range(1, min(5, len(items) + 1)):  # Ограничение до 6 элементов
+                    item = items.Item(i)
                     if item.Subject == tracked_msg_subject:
                         sent_message = item
                         break
@@ -303,7 +305,7 @@ def gather_report_from_sent_items(namespace, tracked_msg_subject, msg_report):
             time.sleep(1)
         if sent_message:
             try:
-                sent_message.SaveAs(msg_report)
+                save_msg_to_zip(sent_message, msg_report)
                 sent_files.append(f'Отчет об отправке сохранен по пути {msg_report}')
             except Exception as e:
                 sent_files.append(f'Не удалось сохранить отчет об отправке: {e}')
@@ -334,17 +336,56 @@ def check_inbox_for_responses(namespace, config, stop_event):
                     thread_id = match.group(1)
                     unique_id = match.group(2)
                     pattern_extracted = f'{thread_id}-{unique_id}'
-                    msg_response = os.path.join(config['lineedit_output_edo'], f'response-{pattern_extracted}-eml.msg')
-                    try:
-                        item.SaveAs(msg_response)
-                        print(f'Сообщение сохранено по пути: {msg_response}')
-                    except Exception as e:
-                        print(f'Не удалось сохранить сообщение: {e}')
+                    zip_path = os.path.join(config['lineedit_output_edo'], f'response-{pattern_extracted}.zip')
+                    save_msg_to_zip(item, zip_path)
+                    print(f'Сообщение и вложения сохранены в архив: {zip_path}')
                     processed_items.add(item.EntryID)
                     save_processed_items(processed_items)  # Обновляем файл после добавления нового сообщения
     except Exception as e:
         print(f'Ошибка при мониторинге папки входящих: {e}')
 
+
+def save_msg_to_zip(item, zip_name):
+    def resolve_sender_email_address():
+        if item.SenderEmailType == "SMTP":
+            return item.SenderEmailAddress
+        elif item.SenderEmailType == "EX":
+            return item.Sender.GetExchangeUser().PrimarySmtpAddress
+
+    def resolve_recipients_email_address():
+        addresses = []
+        for x in item.Recipients:
+            try:
+                addresses.append(x.AddressEntry.GetExchangeUser().PrimarySmtpAddress)
+            except AttributeError:
+                addresses.append(x.AddressEntry.Address)
+        return addresses
+    temp_dir = zip_name[:-4]
+    os.makedirs(temp_dir, exist_ok=True)
+    meta = {
+        'date': item.ReceivedTime.strftime("%Y-%m-%d %H:%M:%S"),
+        'sender': resolve_sender_email_address(),
+        'recipients': resolve_recipients_email_address(),
+        'subject': item.Subject,
+        'attachments': {},
+        'body': item.Body
+    }
+    for att in item.Attachments:
+        file_uuid = str(uuid4()) + '.' + att.FileName.split('.')[-1]
+        file_path = os.path.join(temp_dir, file_uuid)
+        att.SaveAsFile(file_path)
+        meta['attachments'][file_uuid] = att.FileName
+    meta_path = os.path.join(temp_dir, 'meta.json')
+    with open(meta_path, 'w', encoding='utf-8') as meta_file:
+        json.dump(meta, meta_file, ensure_ascii=False, indent=4)
+    zip_path = zip_name
+    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        zipf.write(meta_path, os.path.basename(meta_path))
+        for file_uuid, original_name in meta['attachments'].items():
+            file_path = os.path.join(temp_dir, file_uuid)
+            zipf.write(file_path, file_uuid)
+    shutil.rmtree(temp_dir)
+    print(f'Сообщение и вложения сохранены в архив: {zip_path}')
 
 def monitor_inbox_periodically(namespace, config, interval, stop_event):
     while not stop_event.is_set():
