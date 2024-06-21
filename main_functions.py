@@ -503,6 +503,55 @@ def save_processed_items(processed_items):
             f.write(f"{item}\n")
 
 
+def extract_kuvi_info(email_body):
+    # Поиск номера запроса
+    request_number_match = re.search(r'№\s*<b>(.*?)</b>', email_body)
+    request_number = request_number_match.group(1) if request_number_match else None
+
+    # Поиск ссылки
+    link_match = re.search(r'<a href="(.*?)">по ссылке</a>', email_body)
+    download_link = link_match.group(1) if link_match else None
+
+    return request_number, download_link
+
+
+def download_kuvi_wget(kuvi_link, kuvi_path, proxy='', limit_rate=0):
+    # Формирование команды wget
+    try:
+        command = ["wget/wget.exe"]
+        if proxy:
+            command.extend(["-e", f"use_proxy=yes",
+                            "-e", f"http_proxy={proxy}",
+                            "-e", f"https_proxy={proxy}"])
+        if limit_rate:
+            command.extend(["--limit-rate", limit_rate])
+        command.extend(["-O", kuvi_path, kuvi_link])
+        # Выполнение команды
+        subprocess.run(command, check=True)
+    except:
+        print_exc()
+        return 0
+    if os.path.exists(kuvi_path):
+        return 1
+    else:
+        return 0
+
+
+def safe_filename(filename):
+    # Заменяем недопустимые символы на "-"
+    safe_filename = re.sub(r'[<>:"/\\|?*]', '-', filename)
+    return safe_filename
+
+
+def download_kuvi_response(save_folder, mail_body):
+    request_number, download_link = extract_kuvi_info(mail_body)
+    file_name = safe_filename(request_number)
+    save_filename = os.path.join(save_folder, file_name, '.zip')
+    if os.path.exists(save_filename):
+        return
+    download_kuvi_wget(download_link, save_filename, proxy="192.168.1.1:3128")
+
+
 class EdoWindow(QDialog):
     def __init__(self, config):
         super().__init__()
