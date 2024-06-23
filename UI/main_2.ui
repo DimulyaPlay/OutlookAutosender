@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>519</width>
-    <height>815</height>
+    <width>448</width>
+    <height>909</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -27,30 +27,10 @@
     <property name="bottomMargin">
      <number>3</number>
     </property>
-    <item row="10" column="3">
+    <item row="11" column="3">
      <widget class="QPushButton" name="pushButton_log">
       <property name="text">
        <string>Открыть лог</string>
-      </property>
-     </widget>
-    </item>
-    <item row="10" column="2">
-     <widget class="QPushButton" name="pushButton_edo">
-      <property name="text">
-       <string>СО ЭД</string>
-      </property>
-     </widget>
-    </item>
-    <item row="10" column="0">
-     <widget class="QLabel" name="label_9">
-      <property name="text">
-       <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Разработка &lt;a href=&quot;https://boosty.to/microrazrab&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0000ff;&quot;&gt;DmirtySosnin&lt;/span&gt;&lt;/a&gt;, иконка от &lt;a href=&quot;https://icons8.ru/&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0000ff;&quot;&gt;icons8&lt;/span&gt;&lt;/a&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-      </property>
-      <property name="textFormat">
-       <enum>Qt::RichText</enum>
-      </property>
-      <property name="openExternalLinks">
-       <bool>true</bool>
       </property>
      </widget>
     </item>
@@ -151,25 +131,6 @@
       </layout>
      </widget>
     </item>
-    <item row="9" column="0" colspan="4">
-     <widget class="QPlainTextEdit" name="plainTextEdit_log">
-      <property name="sizePolicy">
-       <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
-        <horstretch>0</horstretch>
-        <verstretch>0</verstretch>
-       </sizepolicy>
-      </property>
-      <property name="undoRedoEnabled">
-       <bool>false</bool>
-      </property>
-      <property name="readOnly">
-       <bool>true</bool>
-      </property>
-      <property name="plainText">
-       <string>Здесь будет отображаться лог работы приложения!</string>
-      </property>
-     </widget>
-    </item>
     <item row="3" column="0" colspan="4">
      <widget class="QGroupBox" name="groupBox_5">
       <property name="sizePolicy">
@@ -254,13 +215,6 @@
         </widget>
        </item>
       </layout>
-     </widget>
-    </item>
-    <item row="8" column="0">
-     <widget class="QCheckBox" name="checkBox_autosend_edo">
-      <property name="text">
-       <string>Отправлять пакеты СО ЭД при обнаружении</string>
-      </property>
      </widget>
     </item>
     <item row="1" column="0" colspan="4">
@@ -415,14 +369,7 @@
       </layout>
      </widget>
     </item>
-    <item row="8" column="1" colspan="3">
-     <widget class="QPushButton" name="pushButto_send_edo_manual">
-      <property name="text">
-       <string>Отправить пакеты СО ЭД вручную</string>
-      </property>
-     </widget>
-    </item>
-    <item row="10" column="1">
+    <item row="11" column="1">
      <spacer name="horizontalSpacer">
       <property name="orientation">
        <enum>Qt::Horizontal</enum>
@@ -434,6 +381,76 @@
        </size>
       </property>
      </spacer>
+    </item>
+    <item row="5" column="0" colspan="4">
+     <widget class="QGroupBox" name="groupBox">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="title">
+       <string>Модуль взаимодействия с СО ЭД</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+      <property name="flat">
+       <bool>true</bool>
+      </property>
+      <layout class="QGridLayout" name="gridLayout_6">
+       <property name="leftMargin">
+        <number>3</number>
+       </property>
+       <property name="topMargin">
+        <number>3</number>
+       </property>
+       <property name="rightMargin">
+        <number>3</number>
+       </property>
+       <property name="bottomMargin">
+        <number>3</number>
+       </property>
+       <property name="spacing">
+        <number>2</number>
+       </property>
+       <item row="0" column="0">
+        <widget class="QPushButton" name="pushButton_edo">
+         <property name="text">
+          <string>Подключение к СО ЭД</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="QPushButton" name="pushButto_send_edo_manual">
+         <property name="text">
+          <string>Отправить пакеты СО ЭД вручную</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="0" colspan="2">
+        <widget class="QCheckBox" name="checkBox_autosend_edo">
+         <property name="text">
+          <string>Отправлять пакеты СО ЭД при обнаружении (требуется перезапуск)</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item row="11" column="0">
+     <widget class="QLabel" name="label_9">
+      <property name="text">
+       <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Разработка &lt;a href=&quot;https://boosty.to/microrazrab&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0000ff;&quot;&gt;DmirtySosnin&lt;/span&gt;&lt;/a&gt;, иконка от &lt;a href=&quot;https://icons8.ru/&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0000ff;&quot;&gt;icons8&lt;/span&gt;&lt;/a&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+      </property>
+      <property name="textFormat">
+       <enum>Qt::RichText</enum>
+      </property>
+      <property name="openExternalLinks">
+       <bool>true</bool>
+      </property>
+     </widget>
     </item>
     <item row="0" column="0" colspan="4">
      <widget class="QGroupBox" name="groupBox_2">
@@ -536,7 +553,7 @@
          <property name="maximumSize">
           <size>
            <width>16777215</width>
-           <height>100</height>
+           <height>80</height>
           </size>
          </property>
         </widget>
@@ -624,6 +641,75 @@
         <widget class="QPushButton" name="pushButton_connection_settings">
          <property name="text">
           <string>Настройки подключения</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item row="10" column="0" colspan="4">
+     <widget class="QPlainTextEdit" name="plainTextEdit_log">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="undoRedoEnabled">
+       <bool>false</bool>
+      </property>
+      <property name="readOnly">
+       <bool>true</bool>
+      </property>
+      <property name="plainText">
+       <string>Здесь будет отображаться лог работы приложения!</string>
+      </property>
+     </widget>
+    </item>
+    <item row="6" column="0" colspan="4">
+     <widget class="QGroupBox" name="groupBox_6">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="title">
+       <string>Модуль загрузчика файлов по ссылкам</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+      <property name="flat">
+       <bool>true</bool>
+      </property>
+      <layout class="QGridLayout" name="gridLayout_7">
+       <property name="leftMargin">
+        <number>3</number>
+       </property>
+       <property name="topMargin">
+        <number>3</number>
+       </property>
+       <property name="rightMargin">
+        <number>3</number>
+       </property>
+       <property name="bottomMargin">
+        <number>3</number>
+       </property>
+       <property name="spacing">
+        <number>2</number>
+       </property>
+       <item row="0" column="0">
+        <widget class="QPushButton" name="pushButton_setup_dm">
+         <property name="text">
+          <string>Настройки модуля</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="0">
+        <widget class="QCheckBox" name="checkBox_start_dm">
+         <property name="text">
+          <string>Включить модуль загрузчика (требуется перезапуск)</string>
          </property>
         </widget>
        </item>

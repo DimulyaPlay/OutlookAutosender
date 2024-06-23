@@ -4,25 +4,27 @@ import os
 import traceback
 from PyQt5.QtWidgets import QMainWindow, QLabel, QLineEdit, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget, \
     QCheckBox, QGroupBox, QComboBox, QPlainTextEdit, QSpinBox, QTimeEdit, QToolButton, QFileDialog,\
-    QPushButton, QApplication, QSystemTrayIcon, QAction, QMenu
+    QPushButton, QApplication, QSystemTrayIcon, QAction, QMenu, QDialog
 from PyQt5.QtGui import QIcon
 from PyQt5 import uic, QtCore
 from PyQt5.QtCore import QTimer, QDateTime, QTime, Qt
 from datetime import datetime, timedelta
 import time
-from threading import Thread, Lock, Event
-from main_functions import save_config, config_file, get_cert_names, gather_mail, send_mail, validate_email, check_time, add_to_startup, config_path, config, EdoWindow, is_file_locked, agregate_edo_messages, monitor_inbox_periodically
+from threading import Thread, Lock
+from queue import Queue
+from main_functions import save_config, config_file, get_cert_names, gather_mail, send_mail, validate_email, check_time, add_to_startup, config_path, config, EdoWindow, is_file_locked, agregate_edo_messages, monitor_inbox_periodically, DMThread
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import pythoncom
 import win32com.client
+from downloader_module import DownloadMasterWindow
 
 
 class MainWindow(QMainWindow):
     def __init__(self, config):
         super().__init__()
         self.monitor_inbox_thread = None
-        self.stop_event = Event()
+        self.download_queue = Queue()
         self.connection_window = None
         self.edo_window = None
         ui_file = 'UI/main_2.ui'
@@ -95,13 +97,14 @@ class MainWindow(QMainWindow):
         pushButton_connection_settings = self.findChild(QPushButton, 'pushButton_connection_settings')
         pushButton_connection_settings.setEnabled(False)
         checkBox_autosend_edo = self.findChild(QCheckBox, 'checkBox_autosend_edo')
-        checkBox_autosend_edo.stateChanged.connect(self.toggle_edo_autosender)
         checkBox_autosend_edo.setChecked(config['checkBox_autosend_edo'])
         self.plainTextEdit_log = self.findChild(QPlainTextEdit, 'plainTextEdit_log')
         pushButton_log = self.findChild(QPushButton, 'pushButton_log')
         pushButton_log.clicked.connect(lambda: os.startfile(os.path.join(config_path, 'log.log')))
         pushButton_edo = self.findChild(QPushButton, 'pushButton_edo')
         pushButton_edo.clicked.connect(self.open_edo_settings)
+        pushButton_setup_dm = self.findChild(QPushButton, 'pushButton_setup_dm')
+        pushButton_setup_dm. clicked.connect(self.open_dm_settings)
         autorun = self.findChild(QCheckBox, 'checkBox_autorun')
         autorun.clicked.connect(add_to_startup)
         self.event_handler = MyHandler(self)
@@ -111,8 +114,8 @@ class MainWindow(QMainWindow):
         self.observer.schedule(self.event_handler, path=self.directory_to_watch, recursive=False)
         self.autostart_timer = QTimer(self)
         self.autostart_timer.timeout.connect(self.toggleScheduler)
-        if config['checkBox_autosend_edo']:
-            self.toggle_edo_autosender(2)
+        if config['checkBox_autosend_edo'] or config['checkBox_start_dm']:
+            self.start_edo_autosender()
         if config['checkBox_autorun'] and config['checkBox_autostart']:
             mm, ss = config['timeEdit_connecting_delay'].split(':')
             secs = int(mm) * 60 + int(ss)
@@ -313,34 +316,35 @@ class MainWindow(QMainWindow):
             self.add_log_message('Обмен с СО ЭД отключен параметрах СО ЭД')
         self.add_log_message('Все пакеты были отправлены (если они были)')
 
-    def toggle_edo_autosender(self, state):
+    def start_edo_autosender(self):
         try:
-            if state == 2:
-                self.observer.start()
-                # Создаем и запускаем поток для периодического мониторинга входящих сообщений
-                self.stop_event.clear()
-                self.monitor_inbox_thread = Thread(target=self.run_monitor_inbox, daemon=True)
-                self.monitor_inbox_thread.start()
-                self.add_log_message(f'Наблюдение за директорией "{self.directory_to_watch}" и мониторинг входящих включены')
-            else:
-                self.observer.stop()
-                self.observer.join()
-                self.add_log_message(f'Наблюдение за директорией "{self.directory_to_watch}" выключено')
-                self.stop_event.set()
-                if self.monitor_inbox_thread is not None:
-                    self.monitor_inbox_thread.join()
-                self.add_log_message(f'Наблюдение за директорией "{self.directory_to_watch}" и мониторинг входящих включены')
-
+            self.observer.start()
+            # Создаем и запускаем поток для периодического мониторинга входящих сообщений
+            self.monitor_inbox_thread = Thread(target=self.run_monitor_inbox, daemon=True)
+            self.monitor_inbox_thread.start()
+            if config['checkBox_start_dm']:
+                download_master = DMThread(config, self.download_queue)
+                download_master.start()
+                self.add_log_message(f'Мониторинг ссылок для скачивания включен.')
+            if config['checkBox_autosend_edo']:
+                self.add_log_message(f'Наблюдение за директорией "{self.directory_to_watch}" и мониторинг входящих включены.')
         except Exception as e:
             traceback.print_exc()
-            self.add_log_message(f'Наблюдение за директорией "{self.directory_to_watch}" не удается, {e}')
+            self.add_log_message(f'Ошибка запуска мониторинга, {e}')
 
     def run_monitor_inbox(self):
         pythoncom.CoInitialize()
         outlook = win32com.client.Dispatch('Outlook.Application')
         namespace = outlook.GetNamespace('MAPI')
-        monitor_inbox_periodically(namespace, config, 60, self.stop_event)
+        monitor_inbox_periodically(namespace, config, 60, self.download_queue)
         pythoncom.CoUninitialize()
+
+    def open_dm_settings(self):
+        dialog = DownloadMasterWindow(self)
+        if dialog.exec_() == QDialog.Accepted:
+            self.config = dialog.new_config
+            self.save_params()
+
 
 class MyHandler(FileSystemEventHandler):
     def __init__(self, main_window):
