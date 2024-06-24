@@ -78,8 +78,8 @@ def load_or_create_default_config(config_file):
         'checkBox_autosend_edo': False,
         'checkBox_start_dm': False,
         'mail_rules': {'noreply-site@rosreestr.ru': [{'rule_name': 'Росреестр 1',
-                                                      're_subject': '',
-                                                      're_body': r'№\s*<b>(.*?)</b>',
+                                                      're_subject': 'о завершении обработки',
+                                                      're_body': r'<b>(.*?)</b>',
                                                       're_link': r'<a href="(.*?)">по ссылке</a>',
                                                       'filename': 'Тело',
                                                       'save_folder': 'C://'}]},
@@ -335,7 +335,7 @@ def check_inbox_for_responses(namespace, config, download_queue, root):
         inbox_folder = namespace.GetDefaultFolder(6)  # Папка "Входящие"
         items = inbox_folder.Items
         items.Sort("[ReceivedTime]", True)  # Сортировка по времени получения
-        for i in range(1, min(21, len(items) + 1)):  # Ограничение до 20 элементов
+        for i in range(1, min(101, len(items) + 1)):  # Ограничение до 20 элементов
             item = items.Item(i)
             if item.EntryID not in processed_items:
                 if config['checkBox_autosend_edo']:
@@ -559,24 +559,23 @@ def extract_re_rules(rules, email_subject, email_body):
 def download_wget(kuvi_link, kuvi_path):
     # Формирование команды wget
     proxy = getproxies().get('http')
+    temp_path = os.path.join(os.curdir, 'temp', os.path.basename(kuvi_path))
+    print(temp_path)
     try:
         command = ["wget/wget.exe"]
         if proxy:
-            command.extend(["-e", f"use_proxy=yes",
+            command.extend(["-e", "use_proxy=yes",
                             "-e", f"http_proxy={proxy}",
                             "-e", f"https_proxy={proxy}"])
         if config['limit_rate']:
-            command.extend(["--limit-rate", limit_rate])
-        command.extend(["-O", kuvi_path, kuvi_link])
-        # Выполнение команды
+            command.extend(["--limit-rate", config['limit_rate']])
+        command.append('--no-check-certificate')
+        command.extend(["-O", temp_path, kuvi_link])
         subprocess.run(command, check=True)
     except:
         print_exc()
-        return 0
-    if os.path.exists(kuvi_path):
-        return 1
-    else:
-        return 0
+    if os.path.exists(temp_path) and os.path.getsize(temp_path) > 0:
+        shutil.move(temp_path, kuvi_path)
 
 
 def safe_filename(filename):
