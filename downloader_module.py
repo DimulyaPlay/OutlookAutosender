@@ -18,6 +18,7 @@ class DownloadMasterWindow(QDialog):
         pushButton_delete_rule.clicked.connect(self.remove_selected_rule)
         self.tableWidget = self.findChild(QWidget, 'tableWidget')
         self.refill_rules_table()
+        self.tableWidget.cellChanged.connect(self.update_rule_from_table)
 
     def save_local_params(self):
         self.new_config['rate_limit'] = self.spinBox_rate_limit.value()
@@ -41,6 +42,21 @@ class DownloadMasterWindow(QDialog):
             else:
                 self.new_config['mail_rules'][email] = [new_rule]
             self.refill_rules_table()
+
+    def update_rule_from_table(self, row, column):
+        email = self.tableWidget.item(row, 1).text()
+        rule_name = self.tableWidget.item(row, 0).text()
+        if email in self.new_config['mail_rules']:
+            rules = self.new_config['mail_rules'][email]
+            for rule in rules:
+                if rule['rule_name'] == rule_name:
+                    rule['rule_name'] = self.tableWidget.item(row, 0).text()
+                    rule['re_subject'] = self.tableWidget.item(row, 2).text()
+                    rule['re_body'] = self.tableWidget.item(row, 3).text()
+                    rule['re_link'] = self.tableWidget.item(row, 4).text()
+                    rule['filename'] = self.tableWidget.item(row, 5).text()
+                    rule['save_folder'] = self.tableWidget.item(row, 6).text()
+                    break
 
     def remove_selected_rule(self):
         row = self.tableWidget.currentRow()
@@ -90,8 +106,8 @@ class AddRuleDialog(QDialog):
         self.save_folder_input = QLineEdit(self)
         self.form_layout.addRow("Email*", self.email_input)
         self.form_layout.addRow("Название правила*", self.rule_name_input)
-        self.form_layout.addRow("Regex темы", self.re_subject_input)
-        self.form_layout.addRow("Regex тела", self.re_body_input)
+        self.form_layout.addRow("Тема содержит", self.re_subject_input)
+        self.form_layout.addRow("Regex назв. файла", self.re_body_input)
         self.form_layout.addRow("Regex ссылки*", self.re_link_input)
         self.form_layout.addRow("Название файла*", self.filename_input)
         self.form_layout.addRow("Папка для сохранения*", self.save_folder_input)

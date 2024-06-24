@@ -121,22 +121,22 @@
      </column>
      <column>
       <property name="text">
-       <string>re для темы</string>
+       <string>Тема содержит</string>
       </property>
      </column>
      <column>
       <property name="text">
-       <string>re для тела</string>
+       <string>Regex назв. файла</string>
       </property>
      </column>
      <column>
       <property name="text">
-       <string>re для ссылки</string>
+       <string>Regex для ссылки</string>
       </property>
      </column>
      <column>
       <property name="text">
-       <string>Имя для файла</string>
+       <string>Искать назв. файла в </string>
       </property>
      </column>
      <column>

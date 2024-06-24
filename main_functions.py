@@ -329,17 +329,17 @@ def gather_report_from_sent_items(namespace, tracked_msg_subject, msg_report):
     return sent_files
 
 
-def check_inbox_for_responses(namespace, config, download_queue):
-    processed_items = load_processed_items()
+def check_inbox_for_responses(namespace, config, download_queue, root):
     try:
+        processed_items = load_processed_items()
         inbox_folder = namespace.GetDefaultFolder(6)  # Папка "Входящие"
-        if config['checkBox_autosend_edo']:
-            items = inbox_folder.Items
-            items.Sort("[ReceivedTime]", True)  # Сортировка по времени получения
-            pattern = r'.*\[tid-(\d+)-(\d+)\].*'  # Паттерн для поиска
-            for i in range(1, min(21, len(items) + 1)):  # Ограничение до 20 элементов
-                item = items.Item(i)
-                if item.EntryID not in processed_items:
+        items = inbox_folder.Items
+        items.Sort("[ReceivedTime]", True)  # Сортировка по времени получения
+        for i in range(1, min(21, len(items) + 1)):  # Ограничение до 20 элементов
+            item = items.Item(i)
+            if item.EntryID not in processed_items:
+                if config['checkBox_autosend_edo']:
+                    pattern = r'.*\[tid-(\d+)-(\d+)\].*'  # Паттерн для поиска
                     match = re.search(pattern, item.Subject)
                     if match:
                         print(f'Найдено сообщение с паттерном: {item.Subject}')
@@ -349,22 +349,29 @@ def check_inbox_for_responses(namespace, config, download_queue):
                         zip_path = os.path.join(config['lineedit_output_edo'], f'response-{pattern_extracted}.zip')
                         save_msg_to_zip(item, zip_path)
                         print(f'Сообщение и вложения сохранены в архив: {zip_path}')
-                    if config['checkBox_start_dm']:
-                        sender_email = resolve_sender_email_address(item)
-                        if sender_email in config['mail_rules'].keys():
-                            message_body = item.Body
-                            download_queue.put([sender_email, message_body])
-                    processed_items.add(item.EntryID)
-                    save_processed_items(processed_items)  # Обновляем файл после добавления нового сообщения
+                if config['checkBox_start_dm']:
+                    sender_email = resolve_sender_email_address(item)
+                    if sender_email in config['mail_rules'].keys():
+                        root.add_log_message(f'Обработка письма от {sender_email}')
+                        message_subject = item.Subject
+                        message_body = item.HTMLBody
+                        download_queue.put([sender_email, message_subject, message_body])
+                processed_items.add(item.EntryID)
+                save_processed_items(processed_items)  # Обновляем файл после добавления нового сообщения
     except Exception as e:
+        print_exc()
         print(f'Ошибка при мониторинге папки входящих: {e}')
+        return 1
 
 
 def resolve_sender_email_address(item):
-    if item.SenderEmailType == "SMTP":
-        return item.SenderEmailAddress
-    elif item.SenderEmailType == "EX":
-        return item.Sender.GetExchangeUser().PrimarySmtpAddress
+    try:
+        try:
+            return item.Sender.GetExchangeUser().PrimarySmtpAddress
+        except:
+            return item.SenderEmailAddress
+    except:
+        return 'OutlookMailServer'
 
 
 def resolve_recipients_email_address(item):
@@ -406,9 +413,13 @@ def save_msg_to_zip(item, zip_name):
     print(f'Сообщение и вложения сохранены в архив: {zip_path}')
 
 
-def monitor_inbox_periodically(namespace, config, interval, download_queue):
-    check_inbox_for_responses(namespace, config, download_queue)
-    time.sleep(interval)
+def monitor_inbox_periodically(root, namespace, config, download_queue):
+    while True:
+        error = check_inbox_for_responses(namespace, config, download_queue, root)
+        if error:
+            root.add_log_message('Возникла ошибка при проверке входящих сообщений. Повтор через 10 мин.')
+            time.sleep(600)
+        time.sleep(60)
 
 
 def send_mail(attachments, manual=True):
@@ -523,22 +534,26 @@ def save_processed_items(processed_items):
 
 
 def extract_re_rules(rules, email_subject, email_body):
-        pattern_subject = rules['re_subject']
-        pattern_body = rules['re_body']
-        pattern_link = rules['re_link']
-        subject_match = None
-        body_match = None
-        # pattern_link = r'<a href="(.*?)">по ссылке</a>'
-        # pattern_body = r'№\s*<b>(.*?)</b>'
-        if pattern_subject:
-            pattern_subject_match = re.search(pattern_subject, email_subject)
-            subject_match = pattern_subject_match.group(1) if pattern_subject_match else None
-        if pattern_body:
-            pattern_body_match = re.search(pattern_body, email_body)
+    pattern_for_find = rules['re_body']
+    pattern_link = rules['re_link']
+    if pattern_for_find:
+        if rules['filename'] == 'Тема':
+            pattern_body_match = re.search(pattern_for_find, email_subject)
             body_match = pattern_body_match.group(1) if pattern_body_match else None
-        link_match = re.search(pattern_link, email_body)
-        download_link = link_match.group(1) if link_match else None
-        return subject_match, body_match, download_link
+        elif rules['filename'] == 'Тело':
+            pattern_body_match = re.search(pattern_for_find, email_body)
+            body_match = pattern_body_match.group(1) if pattern_body_match else None
+        elif rules['filename'] == 'Время':
+            body_match = get_timestamp()
+        else:
+            from uuid import uuid4
+            body_match = str(uuid4())
+    else:
+        from uuid import uuid4
+        body_match = str(uuid4())
+    link_match = re.search(pattern_link, email_body)
+    download_link = link_match.group(1) if link_match else None
+    return body_match, download_link
 
 
 def download_wget(kuvi_link, kuvi_path):
@@ -566,27 +581,26 @@ def download_wget(kuvi_link, kuvi_path):
 
 def safe_filename(filename):
     # Заменяем недопустимые символы на "-"
-    safe_filename = re.sub(r'[<>:"/\\|?*]', '-', filename)
-    return safe_filename
+    if filename:
+        filename = re.sub(r'[<>:"/\\|?*]', '-', filename)
+    return filename
 
 
 def download_href_response(rules, mail_subject, mail_body):
     for rule in rules:
-        subject_match, body_match, download_link = extract_re_rules(rule, mail_subject, mail_body)
-        if rule['filename'] == 'Тема':
-            file_name = safe_filename(subject_match)
-        elif rule['filename'] == 'Тело':
+        if rule['re_subject'] and rule['re_subject'] not in mail_subject.lower():
+            continue
+        print(mail_subject)
+        body_match, download_link = extract_re_rules(rule, mail_subject, mail_body)
+        if download_link:
             file_name = safe_filename(body_match)
-        elif rule['filename'] == 'Время':
-            file_name = get_timestamp()
+            save_folder = rule['save_folder']
+            save_filename = os.path.join(save_folder, f'{file_name}.zip')
+            if os.path.exists(save_filename):
+                return
+            download_wget(download_link, save_filename)
         else:
-            from uuid import uuid4
-            file_name = uuid4()
-        save_folder = rule['save_folder']
-        save_filename = os.path.join(save_folder, file_name, '.zip')
-        if os.path.exists(save_filename):
-            return
-        download_wget(download_link, save_filename)
+            print('Не удалось найти ссылку')
 
 
 class EdoWindow(QDialog):
@@ -620,7 +634,7 @@ class EdoWindow(QDialog):
 
 class DMThread(Thread):
     def __init__(self, config, task_queue):
-        Thread.__init__(self)
+        Thread.__init__(self, daemon=True)
         self.config = config
         self.task_queue = task_queue
 
@@ -632,4 +646,5 @@ class DMThread(Thread):
                 download_href_response(rules, message_subject, message_body)
                 self.task_queue.task_done()
             except Exception as e:
+                print_exc()
                 print(f'Ошибка в процессе обработки: {e}')

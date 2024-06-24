@@ -318,7 +318,6 @@ class MainWindow(QMainWindow):
 
     def start_edo_autosender(self):
         try:
-            self.observer.start()
             # Создаем и запускаем поток для периодического мониторинга входящих сообщений
             self.monitor_inbox_thread = Thread(target=self.run_monitor_inbox, daemon=True)
             self.monitor_inbox_thread.start()
@@ -327,6 +326,7 @@ class MainWindow(QMainWindow):
                 download_master.start()
                 self.add_log_message(f'Мониторинг ссылок для скачивания включен.')
             if config['checkBox_autosend_edo']:
+                self.observer.start()
                 self.add_log_message(f'Наблюдение за директорией "{self.directory_to_watch}" и мониторинг входящих включены.')
         except Exception as e:
             traceback.print_exc()
@@ -336,7 +336,7 @@ class MainWindow(QMainWindow):
         pythoncom.CoInitialize()
         outlook = win32com.client.Dispatch('Outlook.Application')
         namespace = outlook.GetNamespace('MAPI')
-        monitor_inbox_periodically(namespace, config, 60, self.download_queue)
+        monitor_inbox_periodically(self, namespace, config, self.download_queue)
         pythoncom.CoUninitialize()
 
     def open_dm_settings(self):
