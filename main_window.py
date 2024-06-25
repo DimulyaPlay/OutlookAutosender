@@ -188,7 +188,7 @@ class MainWindow(QMainWindow):
         self.edo_window = EdoWindow(self.config)
         res = self.edo_window.exec_()
         if res:
-            for k,v in self.edo_window.config.items():
+            for k, v in self.edo_window.config.items():
                 self.config[k] = v
             self.save_params()
 

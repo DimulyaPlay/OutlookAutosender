@@ -6,74 +6,14 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1275</width>
-    <height>462</height>
+    <width>1094</width>
+    <height>279</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Конфигурация загрузчика</string>
   </property>
   <layout class="QGridLayout" name="gridLayout">
-   <item row="0" column="2">
-    <widget class="QLabel" name="label_3">
-     <property name="text">
-      <string>Ограничение скорости загрузки</string>
-     </property>
-    </widget>
-   </item>
-   <item row="0" column="6">
-    <widget class="QPushButton" name="pushButton_delete_rule">
-     <property name="text">
-      <string>Удалить</string>
-     </property>
-    </widget>
-   </item>
-   <item row="0" column="4">
-    <widget class="QLabel" name="label_2">
-     <property name="text">
-      <string>Кбит/с</string>
-     </property>
-    </widget>
-   </item>
-   <item row="2" column="0" colspan="7">
-    <widget class="QDialogButtonBox" name="buttonBox">
-     <property name="orientation">
-      <enum>Qt::Horizontal</enum>
-     </property>
-     <property name="standardButtons">
-      <set>QDialogButtonBox::Cancel|QDialogButtonBox::Save</set>
-     </property>
-     <property name="centerButtons">
-      <bool>true</bool>
-     </property>
-    </widget>
-   </item>
-   <item row="0" column="3">
-    <widget class="QSpinBox" name="spinBox_rate_limit">
-     <property name="maximum">
-      <number>99999</number>
-     </property>
-     <property name="singleStep">
-      <number>10</number>
-     </property>
-    </widget>
-   </item>
-   <item row="0" column="0">
-    <widget class="QLabel" name="label">
-     <property name="sizePolicy">
-      <sizepolicy hsizetype="MinimumExpanding" vsizetype="Preferred">
-       <horstretch>0</horstretch>
-       <verstretch>0</verstretch>
-      </sizepolicy>
-     </property>
-     <property name="text">
-      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Укажите Email, письма от которого будут просматриваться, укажите регулярные выражения, по которым можно получить из темы или тела строку, которую использовать для имени скачиваемого файла, если не указывать, имя будет из текущей даты и времени. Укажите желаемое ограничение скорости, чтобы не забивать трафик.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-     </property>
-     <property name="wordWrap">
-      <bool>true</bool>
-     </property>
-    </widget>
-   </item>
    <item row="0" column="5">
     <widget class="QPushButton" name="pushButton_add_rule">
      <property name="text">
@@ -81,8 +21,14 @@
      </property>
     </widget>
    </item>
-   <item row="1" column="0" colspan="7">
+   <item row="3" column="0" colspan="7">
     <widget class="QTableWidget" name="tableWidget">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
      <property name="selectionMode">
       <enum>QAbstractItemView::SingleSelection</enum>
      </property>
@@ -136,11 +82,6 @@
      </column>
      <column>
       <property name="text">
-       <string>Искать назв. файла в </string>
-      </property>
-     </column>
-     <column>
-      <property name="text">
        <string>Место сохранения</string>
       </property>
      </column>
@@ -159,17 +100,86 @@
        <string>&lt;a href=&quot;(.*?)&quot;&gt;по ссылке&lt;/a&gt;</string>
       </property>
      </item>
-     <item row="0" column="6">
+     <item row="0" column="5">
       <property name="text">
        <string>C://RR</string>
       </property>
      </item>
     </widget>
    </item>
-   <item row="0" column="1">
+   <item row="4" column="0" colspan="7">
+    <widget class="QDialogButtonBox" name="buttonBox">
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
+     </property>
+     <property name="standardButtons">
+      <set>QDialogButtonBox::Cancel|QDialogButtonBox::Save</set>
+     </property>
+     <property name="centerButtons">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="5">
+    <widget class="QPushButton" name="pushButton_delete_rule">
+     <property name="text">
+      <string>Удалить</string>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="3">
+    <widget class="QLabel" name="label_2">
+     <property name="text">
+      <string>Кбит/с</string>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="2">
+    <widget class="QSpinBox" name="spinBox_rate_limit">
+     <property name="maximum">
+      <number>99999</number>
+     </property>
+     <property name="singleStep">
+      <number>10</number>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="1" rowspan="3">
     <widget class="Line" name="line">
      <property name="orientation">
       <enum>Qt::Vertical</enum>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="2" colspan="2">
+    <widget class="QLabel" name="label_3">
+     <property name="text">
+      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;Ограничение&lt;br&gt;скорости&lt;br&gt;загрузки&lt;/body&gt;&lt;/html&gt;</string>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignCenter</set>
+     </property>
+    </widget>
+   </item>
+   <item row="0" column="0" rowspan="3">
+    <widget class="QLabel" name="label">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="MinimumExpanding" vsizetype="Ignored">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
+     <property name="minimumSize">
+      <size>
+       <width>0</width>
+       <height>50</height>
+      </size>
+     </property>
+     <property name="text">
+      <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Укажите Email, письма от которого будут просматриваться. По желанию укажите фрагмент текста, который должен встречаться в теме, чтобы письмо обработалось. По желанию укажите регулярное выражение для поиска имени файла, если не указывать, будет присвоено имя в виде текущей даты и времени. Укажите регулярное выражение для поиска ссылки для скачивания. Укажите место сохранения скачанных файлов Укажите желаемое ограничение скорости скачивания.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+     </property>
+     <property name="wordWrap">
+      <bool>true</bool>
      </property>
     </widget>
    </item>

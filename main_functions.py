@@ -21,7 +21,6 @@ import win32print
 import random
 import pythoncom
 from PyPDF2 import PdfReader, PdfWriter
-from uuid import uuid4
 from threading import Thread
 from urllib.request import getproxies
 
@@ -36,8 +35,20 @@ def save_config(config_file, config):
 config_path = os.path.dirname(sys.argv[0])
 temp_path = os.path.join(config_path, 'temp')
 if os.path.isdir(temp_path):
-    shutil.rmtree(temp_path)
-    os.mkdir(temp_path)
+    try:
+        shutil.rmtree(temp_path)
+        os.mkdir(temp_path)
+    except:
+        try:
+            import psutil
+            for proc in psutil.process_iter(['pid', 'name']):
+                if proc.info['name'] == 'wget.exe':
+                    proc.terminate()
+                    break
+            shutil.rmtree(temp_path)
+            os.mkdir(temp_path)
+        except:
+            pass
 else:
     os.mkdir(temp_path)
 if not os.path.exists(config_path):
@@ -78,12 +89,10 @@ def load_or_create_default_config(config_file):
         'checkBox_autosend_edo': False,
         'checkBox_start_dm': False,
         'mail_rules': {'noreply-site@rosreestr.ru': [{'rule_name': 'Росреестр 1',
-                                                      're_subject': 'о завершении обработки',
-                                                      're_body': r'<b>(.*?)</b>',
+                                                      'subject_contains': 'о завершении обработки',
+                                                      're_filename': r'<b>(.*?)</b>',
                                                       're_link': r'<a href="(.*?)">по ссылке</a>',
-                                                      'filename': 'Тело',
                                                       'save_folder': 'C://'}]},
-        'use_proxy': True,
         'limit_rate': 0
     }
     if not os.path.exists(config_file):
@@ -329,7 +338,7 @@ def gather_report_from_sent_items(namespace, tracked_msg_subject, msg_report):
     return sent_files
 
 
-def check_inbox_for_responses(namespace, config, download_queue, root):
+def check_inbox_for_responses(namespace, config, download_queue):
     try:
         processed_items = load_processed_items()
         inbox_folder = namespace.GetDefaultFolder(6)  # Папка "Входящие"
@@ -349,15 +358,15 @@ def check_inbox_for_responses(namespace, config, download_queue, root):
                         zip_path = os.path.join(config['lineedit_output_edo'], f'response-{pattern_extracted}.zip')
                         save_msg_to_zip(item, zip_path)
                         print(f'Сообщение и вложения сохранены в архив: {zip_path}')
+                        processed_items.add(item.EntryID)
+                        save_processed_items(processed_items)  # Обновляем файл после добавления нового сообщения
                 if config['checkBox_start_dm']:
                     sender_email = resolve_sender_email_address(item)
                     if sender_email in config['mail_rules'].keys():
-                        root.add_log_message(f'Обработка письма от {sender_email}')
                         message_subject = item.Subject
                         message_body = item.HTMLBody
-                        download_queue.put([sender_email, message_subject, message_body])
-                processed_items.add(item.EntryID)
-                save_processed_items(processed_items)  # Обновляем файл после добавления нового сообщения
+                        download_queue.put([item.EntryID, sender_email, message_subject, message_body])
+
     except Exception as e:
         print_exc()
         print(f'Ошибка при мониторинге папки входящих: {e}')
@@ -415,7 +424,7 @@ def save_msg_to_zip(item, zip_name):
 
 def monitor_inbox_periodically(root, namespace, config, download_queue):
     while True:
-        error = check_inbox_for_responses(namespace, config, download_queue, root)
+        error = check_inbox_for_responses(namespace, config, download_queue)
         if error:
             root.add_log_message('Возникла ошибка при проверке входящих сообщений. Повтор через 10 мин.')
             time.sleep(600)
@@ -520,6 +529,11 @@ def get_timestamp():
     return timestamp
 
 
+def get_timestamp_date():
+    now = datetime.now().strftime('%Y-%m-%d-%H-%M-%S')
+    return now
+
+
 def load_processed_items():
     if not os.path.exists(PROCESSED_ITEMS_FILE):
         return set()
@@ -533,34 +547,19 @@ def save_processed_items(processed_items):
             f.write(f"{item}\n")
 
 
-def extract_re_rules(rules, email_subject, email_body):
-    pattern_for_find = rules['re_body']
+def extract_re_rules(rules, email_text):
+    pattern_for_find = rules['re_filename']
     pattern_link = rules['re_link']
-    if pattern_for_find:
-        if rules['filename'] == 'Тема':
-            pattern_body_match = re.search(pattern_for_find, email_subject)
-            body_match = pattern_body_match.group(1) if pattern_body_match else None
-        elif rules['filename'] == 'Тело':
-            pattern_body_match = re.search(pattern_for_find, email_body)
-            body_match = pattern_body_match.group(1) if pattern_body_match else None
-        elif rules['filename'] == 'Время':
-            body_match = get_timestamp()
-        else:
-            from uuid import uuid4
-            body_match = str(uuid4())
-    else:
-        from uuid import uuid4
-        body_match = str(uuid4())
-    link_match = re.search(pattern_link, email_body)
+    filename_match = re.search(pattern_for_find, email_text)
+    filename = filename_match.group(1) if filename_match else None
+    link_match = re.search(pattern_link, email_text)
     download_link = link_match.group(1) if link_match else None
-    return body_match, download_link
+    return filename, download_link
 
 
 def download_wget(kuvi_link, kuvi_path):
-    # Формирование команды wget
     proxy = getproxies().get('http')
     temp_path = os.path.join(os.curdir, 'temp', os.path.basename(kuvi_path))
-    print(temp_path)
     try:
         command = ["wget/wget.exe"]
         if proxy:
@@ -568,38 +567,49 @@ def download_wget(kuvi_link, kuvi_path):
                             "-e", f"http_proxy={proxy}",
                             "-e", f"https_proxy={proxy}"])
         if config['limit_rate']:
-            command.extend(["--limit-rate", config['limit_rate']])
+            command.append(f"--limit-rate={config['limit_rate']}k")
         command.append('--no-check-certificate')
+        command.append('--tries=3')
         command.extend(["-O", temp_path, kuvi_link])
         subprocess.run(command, check=True)
     except:
         print_exc()
+        return 1
     if os.path.exists(temp_path) and os.path.getsize(temp_path) > 0:
         shutil.move(temp_path, kuvi_path)
+        return 0
 
 
 def safe_filename(filename):
     # Заменяем недопустимые символы на "-"
     if filename:
         filename = re.sub(r'[<>:"/\\|?*]', '-', filename)
-    return filename
+        return filename
+    else:
+        return get_timestamp_date()
 
 
 def download_href_response(rules, mail_subject, mail_body):
     for rule in rules:
-        if rule['re_subject'] and rule['re_subject'] not in mail_subject.lower():
+        if rule['subject_contains'] and rule['subject_contains'].lower() not in mail_subject.lower():
             continue
-        print(mail_subject)
-        body_match, download_link = extract_re_rules(rule, mail_subject, mail_body)
-        if download_link:
-            file_name = safe_filename(body_match)
-            save_folder = rule['save_folder']
-            save_filename = os.path.join(save_folder, f'{file_name}.zip')
-            if os.path.exists(save_filename):
-                return
-            download_wget(download_link, save_filename)
-        else:
+        filename, download_link = extract_re_rules(rule, mail_subject + ' ' + mail_body)
+        if not download_link:
             print('Не удалось найти ссылку')
+            return 0
+        file_name = safe_filename(filename)
+        save_folder = rule['save_folder']
+        save_filename = os.path.join(save_folder, f'{file_name}.zip')
+        if os.path.exists(save_filename):
+            return 0
+        else:
+            print(f'Загружается {file_name}')
+            error = download_wget(download_link, save_filename)
+            if error:
+                print(f'Не удалось загрузить {file_name}. Отправлен в конец очереди.')
+            return error
+
+
 
 
 class EdoWindow(QDialog):
@@ -640,10 +650,17 @@ class DMThread(Thread):
     def run(self):
         while True:
             try:
-                sender_email, message_subject, message_body = self.task_queue.get()
+                message_id, sender_email, message_subject, message_body = self.task_queue.get()
                 rules = config['mail_rules'][sender_email]
-                download_href_response(rules, message_subject, message_body)
-                self.task_queue.task_done()
+                error = download_href_response(rules, message_subject, message_body)
+                if not error:
+                    processed_items = load_processed_items()
+                    processed_items.add(message_id)
+                    save_processed_items(processed_items)  # Обновляем файл после добавления нового сообщения
+                    self.task_queue.task_done()
+
+                else:
+                    self.task_queue.put([message_id, sender_email, message_subject, message_body])
             except Exception as e:
                 print_exc()
                 print(f'Ошибка в процессе обработки: {e}')
