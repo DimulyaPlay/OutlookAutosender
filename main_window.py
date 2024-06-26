@@ -7,12 +7,12 @@ from PyQt5.QtWidgets import QMainWindow, QLabel, QLineEdit, QTableWidget, QTable
     QPushButton, QApplication, QSystemTrayIcon, QAction, QMenu, QDialog
 from PyQt5.QtGui import QIcon
 from PyQt5 import uic, QtCore
-from PyQt5.QtCore import QTimer, QDateTime, QTime, Qt
+from PyQt5.QtCore import QTimer, QDateTime, QTime, Qt, QThread, pyqtSignal
 from datetime import datetime, timedelta
 import time
 from threading import Thread, Lock
 from queue import Queue
-from main_functions import save_config, config_file, get_cert_names, gather_mail, send_mail, validate_email, check_time, add_to_startup, config_path, config, EdoWindow, is_file_locked, agregate_edo_messages, monitor_inbox_periodically, DMThread
+from main_functions import save_config, message_queue, config_file, get_cert_names, gather_mail, send_mail, validate_email, check_time, add_to_startup, config_path, config, EdoWindow, is_file_locked, agregate_edo_messages, monitor_inbox_periodically, DMThread
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import pythoncom
@@ -33,6 +33,12 @@ class MainWindow(QMainWindow):
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowMaximizeButtonHint)
         self.setWindowIcon(icon)
         self.running = False
+
+        # Создаем и запускаем поток мониторинга очереди
+        self.queue_thread = QueueMonitorThread()
+        self.queue_thread.message_signal.connect(self.add_log_message)
+        self.queue_thread.start()
+
         self.schedule_timers = []
         self.timer = QTimer(self)  # Создание таймера
         def tray_activated(reason):
@@ -182,6 +188,7 @@ class MainWindow(QMainWindow):
         self.hide_to_tray()
 
     def closeEvent(self, event):
+        message_queue.put(None)
         sys.exit(0)
 
     def open_edo_settings(self):
@@ -336,7 +343,7 @@ class MainWindow(QMainWindow):
         pythoncom.CoInitialize()
         outlook = win32com.client.Dispatch('Outlook.Application')
         namespace = outlook.GetNamespace('MAPI')
-        monitor_inbox_periodically(self, namespace, config, self.download_queue)
+        monitor_inbox_periodically(namespace, config, self.download_queue)
         pythoncom.CoUninitialize()
 
     def open_dm_settings(self):
@@ -383,3 +390,14 @@ class MyHandler(FileSystemEventHandler):
             if dest_path.endswith('.zip'):
                 print(dest_path)
                 self.add_file(dest_path)
+
+
+class QueueMonitorThread(QThread):
+    message_signal = pyqtSignal(str)
+
+    def run(self):
+        while True:
+            message = message_queue.get()
+            if message is None:
+                break
+            self.message_signal.emit(message)

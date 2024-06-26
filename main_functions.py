@@ -23,6 +23,7 @@ import pythoncom
 from PyPDF2 import PdfReader, PdfWriter
 from threading import Thread, Lock
 from urllib.request import getproxies
+from queue import Queue
 
 
 def save_config(config_file, config):
@@ -61,6 +62,7 @@ PROCESSED_ITEMS_FILE = os.path.join(config_path, 'saved_msg.txt')
 DOWNLOADED_ITEMS_FILE = os.path.join(config_path, 'downloaded_msg.txt')
 in_queue_items = set()
 items_lock = Lock()
+message_queue = Queue()
 
 
 def load_or_create_default_config(config_file):
@@ -341,7 +343,7 @@ def gather_report_from_sent_items(namespace, tracked_msg_subject, msg_report):
     return sent_files
 
 
-def check_inbox_for_responses(root, namespace, config, download_queue):
+def check_inbox_for_responses(namespace, config, download_queue):
     try:
         processed_items = load_processed_items()
         downloaded_items = load_downloaded_items()
@@ -367,37 +369,38 @@ def check_inbox_for_responses(root, namespace, config, download_queue):
                 if config['checkBox_start_dm']:
                     sender_email = resolve_sender_email_address(item)
                     if sender_email in config['mail_rules'].keys():
-                        root.add_log_message(f'Найдено письмо от {sender_email}. проверка правил.')
+                        message_queue.put(f'Найдено письмо от {sender_email}. проверка правил.')
                         message_subject = item.Subject
                         message_body = item.HTMLBody
                         rules = config['mail_rules'][sender_email]
                         for rule in rules:
-                            root.add_log_message('______________________')
-                            root.add_log_message(f'Правило {rule["rule_name"]}.')
+                            message_queue.put('______________________')
+                            message_queue.put(f'Правило {rule["rule_name"]}.')
                             if rule['subject_contains'] and rule['subject_contains'].lower() not in message_subject.lower():
-                                root.add_log_message(f'Тема не содержит {rule["subject_contains"]}. Письмо ОТКЛОНЕНО.')
+                                message_queue.put(f'Тема не содержит "{rule["subject_contains"]}". Письмо ОТКЛОНЕНО.')
+                                processed_items.add(item.EntryID)
                                 continue
                             filename, download_link = extract_re_rules(rule, message_subject + ' ' + message_body)
                             if not download_link:
-                                root.add_log_message(f'Не найдена ссылка для скачивания. Письмо ОТКЛОНЕНО.')
+                                message_queue.put(f'Не найдена ссылка для скачивания. Письмо ОТКЛОНЕНО.')
+                                processed_items.add(item.EntryID)
                                 continue
                             if not filename:
-                                root.add_log_message(f'Не найдено имя. Файл будет сохранен с временным штампом.')
+                                message_queue.put(f'Не найдено имя. Файл будет сохранен с временным штампом.')
                             else:
-                                root.add_log_message(f'Файл найден, будет сохранен с именем {filename}')
+                                message_queue.put(f'Файл найден, будет сохранен с именем {filename}')
                             file_name = safe_filename(filename)
                             save_folder = rule['save_folder']
                             save_filename = os.path.join(save_folder, f'{file_name}.zip')
                             if os.path.exists(save_filename):
-                                root.add_log_message(f'По пути {save_filename} уже имеется файл. Загрузка ОТМЕНЕНА.')
+                                message_queue.put(f'По пути {save_filename} уже имеется файл. Загрузка ОТМЕНЕНА.')
                                 processed_items.add(item.EntryID)
-                                save_processed_items(processed_items)  # Обновляем файл после добавления нового сообщения
                                 continue
                             download_queue.put([item.EntryID, save_filename, download_link])
                             in_queue_items.add(item.EntryID)
                     else:
                         processed_items.add(item.EntryID)
-                        save_processed_items(processed_items)  # Обновляем файл после добавления нового сообщения
+        save_processed_items(processed_items)  # Обновляем файл после добавления нового сообщения
     except Exception as e:
         print_exc()
         print(f'Ошибка при мониторинге папки входящих: {e}')
@@ -453,11 +456,11 @@ def save_msg_to_zip(item, zip_name):
     print(f'Сообщение и вложения сохранены в архив: {zip_path}')
 
 
-def monitor_inbox_periodically(root, namespace, config, download_queue):
+def monitor_inbox_periodically(namespace, config, download_queue):
     while True:
-        error = check_inbox_for_responses(root, namespace, config, download_queue)
+        error = check_inbox_for_responses(namespace, config, download_queue)
         if error:
-            root.add_log_message('Возникла ошибка при проверке входящих сообщений. Повтор через 10 мин.')
+            message_queue.put('Возникла ошибка при проверке входящих сообщений. Повтор через 10 мин.')
             time.sleep(600)
         time.sleep(60)
 
@@ -674,7 +677,7 @@ class DMThread(Thread):
                 error = download_wget(download_link, save_filename)
                 if error:
                     self.task_queue.put([entryid, save_filename, download_link])
-                    print(f'Не удалось загрузить {save_filename}. Отправлен в конец очереди.')
+                    message_queue.put(f'Не удалось загрузить {save_filename}. Отправлен в конец очереди.')
                 else:
                     with items_lock:
                         downloaded_items = load_downloaded_items()
