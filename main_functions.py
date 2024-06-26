@@ -21,7 +21,7 @@ import win32print
 import random
 import pythoncom
 from PyPDF2 import PdfReader, PdfWriter
-from threading import Thread
+from threading import Thread, Lock
 from urllib.request import getproxies
 
 
@@ -58,6 +58,9 @@ if not os.path.exists(ReportsPrinted):
     os.mkdir(ReportsPrinted)
 config_file = os.path.join(config_path, 'config.json')
 PROCESSED_ITEMS_FILE = os.path.join(config_path, 'saved_msg.txt')
+DOWNLOADED_ITEMS_FILE = os.path.join(config_path, 'downloaded_msg.txt')
+in_queue_items = set()
+items_lock = Lock()
 
 
 def load_or_create_default_config(config_file):
@@ -338,15 +341,16 @@ def gather_report_from_sent_items(namespace, tracked_msg_subject, msg_report):
     return sent_files
 
 
-def check_inbox_for_responses(namespace, config, download_queue):
+def check_inbox_for_responses(root, namespace, config, download_queue):
     try:
         processed_items = load_processed_items()
+        downloaded_items = load_downloaded_items()
         inbox_folder = namespace.GetDefaultFolder(6)  # Папка "Входящие"
         items = inbox_folder.Items
         items.Sort("[ReceivedTime]", True)  # Сортировка по времени получения
         for i in range(1, min(101, len(items) + 1)):  # Ограничение до 20 элементов
             item = items.Item(i)
-            if item.EntryID not in processed_items:
+            if item.EntryID not in processed_items and item.EntryID not in in_queue_items and item.EntryID not in downloaded_items:
                 if config['checkBox_autosend_edo']:
                     pattern = r'.*\[tid-(\d+)-(\d+)\].*'  # Паттерн для поиска
                     match = re.search(pattern, item.Subject)
@@ -363,13 +367,37 @@ def check_inbox_for_responses(namespace, config, download_queue):
                 if config['checkBox_start_dm']:
                     sender_email = resolve_sender_email_address(item)
                     if sender_email in config['mail_rules'].keys():
+                        root.add_log_message(f'Найдено письмо от {sender_email}. проверка правил.')
                         message_subject = item.Subject
                         message_body = item.HTMLBody
-                        download_queue.put([item.EntryID, sender_email, message_subject, message_body])
+                        rules = config['mail_rules'][sender_email]
+                        for rule in rules:
+                            root.add_log_message('______________________')
+                            root.add_log_message(f'Правило {rule["rule_name"]}.')
+                            if rule['subject_contains'] and rule['subject_contains'].lower() not in message_subject.lower():
+                                root.add_log_message(f'Тема не содержит {rule["subject_contains"]}. Письмо ОТКЛОНЕНО.')
+                                continue
+                            filename, download_link = extract_re_rules(rule, message_subject + ' ' + message_body)
+                            if not download_link:
+                                root.add_log_message(f'Не найдена ссылка для скачивания. Письмо ОТКЛОНЕНО.')
+                                continue
+                            if not filename:
+                                root.add_log_message(f'Не найдено имя. Файл будет сохранен с временным штампом.')
+                            else:
+                                root.add_log_message(f'Файл найден, будет сохранен с именем {filename}')
+                            file_name = safe_filename(filename)
+                            save_folder = rule['save_folder']
+                            save_filename = os.path.join(save_folder, f'{file_name}.zip')
+                            if os.path.exists(save_filename):
+                                root.add_log_message(f'По пути {save_filename} уже имеется файл. Загрузка ОТМЕНЕНА.')
+                                processed_items.add(item.EntryID)
+                                save_processed_items(processed_items)  # Обновляем файл после добавления нового сообщения
+                                continue
+                            download_queue.put([item.EntryID, save_filename, download_link])
+                            in_queue_items.add(item.EntryID)
                     else:
                         processed_items.add(item.EntryID)
                         save_processed_items(processed_items)  # Обновляем файл после добавления нового сообщения
-
     except Exception as e:
         print_exc()
         print(f'Ошибка при мониторинге папки входящих: {e}')
@@ -427,7 +455,7 @@ def save_msg_to_zip(item, zip_name):
 
 def monitor_inbox_periodically(root, namespace, config, download_queue):
     while True:
-        error = check_inbox_for_responses(namespace, config, download_queue)
+        error = check_inbox_for_responses(root, namespace, config, download_queue)
         if error:
             root.add_log_message('Возникла ошибка при проверке входящих сообщений. Повтор через 10 мин.')
             time.sleep(600)
@@ -550,6 +578,18 @@ def save_processed_items(processed_items):
             f.write(f"{item}\n")
 
 
+def load_downloaded_items():
+    if not os.path.exists(DOWNLOADED_ITEMS_FILE):
+        return set()
+    with open(DOWNLOADED_ITEMS_FILE, 'r') as f:
+        return set(line.strip() for line in f)
+
+
+def save_downloaded_items(downloaded_items):
+    with open(DOWNLOADED_ITEMS_FILE, 'w') as f:
+        for item in downloaded_items:
+            f.write(f"{item}\n")
+
 def extract_re_rules(rules, email_text):
     pattern_for_find = rules['re_filename']
     pattern_link = rules['re_link']
@@ -592,29 +632,6 @@ def safe_filename(filename):
         return get_timestamp_date()
 
 
-def download_href_response(rules, mail_subject, mail_body):
-    for rule in rules:
-        if rule['subject_contains'] and rule['subject_contains'].lower() not in mail_subject.lower():
-            continue
-        filename, download_link = extract_re_rules(rule, mail_subject + ' ' + mail_body)
-        if not download_link:
-            print('Не удалось найти ссылку')
-            return 0
-        file_name = safe_filename(filename)
-        save_folder = rule['save_folder']
-        save_filename = os.path.join(save_folder, f'{file_name}.zip')
-        if os.path.exists(save_filename):
-            return 0
-        else:
-            print(f'Загружается {file_name}')
-            error = download_wget(download_link, save_filename)
-            if error:
-                print(f'Не удалось загрузить {file_name}. Отправлен в конец очереди.')
-            return error
-
-
-
-
 class EdoWindow(QDialog):
     def __init__(self, config):
         super().__init__()
@@ -653,17 +670,21 @@ class DMThread(Thread):
     def run(self):
         while True:
             try:
-                message_id, sender_email, message_subject, message_body = self.task_queue.get()
-                rules = config['mail_rules'][sender_email]
-                error = download_href_response(rules, message_subject, message_body)
-                if not error:
-                    processed_items = load_processed_items()
-                    processed_items.add(message_id)
-                    save_processed_items(processed_items)  # Обновляем файл после добавления нового сообщения
-                    self.task_queue.task_done()
-
+                entryid, save_filename, download_link = self.task_queue.get()
+                error = download_wget(download_link, save_filename)
+                if error:
+                    self.task_queue.put([entryid, save_filename, download_link])
+                    print(f'Не удалось загрузить {save_filename}. Отправлен в конец очереди.')
                 else:
-                    self.task_queue.put([message_id, sender_email, message_subject, message_body])
+                    with items_lock:
+                        downloaded_items = load_downloaded_items()
+                        downloaded_items.add(entryid)
+                        save_downloaded_items(downloaded_items)
+                        processed_items = load_processed_items()
+                        processed_items.add(entryid)
+                        save_processed_items(processed_items)  # Обновляем файл после добавления нового сообщения
+                        in_queue_items.remove(entryid)
+                    self.task_queue.task_done()
             except Exception as e:
                 print_exc()
                 print(f'Ошибка в процессе обработки: {e}')
