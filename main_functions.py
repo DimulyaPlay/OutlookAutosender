@@ -366,6 +366,9 @@ def check_inbox_for_responses(namespace, config, download_queue):
                         message_subject = item.Subject
                         message_body = item.HTMLBody
                         download_queue.put([item.EntryID, sender_email, message_subject, message_body])
+                    else:
+                        processed_items.add(item.EntryID)
+                        save_processed_items(processed_items)  # Обновляем файл после добавления нового сообщения
 
     except Exception as e:
         print_exc()
