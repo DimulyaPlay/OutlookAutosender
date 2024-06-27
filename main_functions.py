@@ -383,6 +383,11 @@ def check_inbox_for_responses(namespace, config, download_queue):
                             filename, download_link = extract_re_rules(rule, message_subject + ' ' + message_body)
                             if not download_link:
                                 message_queue.put(f'Не найдена ссылка для скачивания. Письмо ОТКЛОНЕНО.')
+                                print('______________________________________')
+                                print('Искомый паттерн:', rule['re_link'])
+                                print('Текст, в котором происходил поиск:')
+                                print(message_subject + ' ' + message_body)
+                                print('______________________________________')
                                 processed_items.add(item.EntryID)
                                 continue
                             if not filename:
