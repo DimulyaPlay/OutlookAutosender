@@ -32,7 +32,7 @@ class DownloadMasterWindow(QDialog):
         if self.tableWidget.rowCount() >= 0:
             self.new_config['mail_rules'] = {}
             for row in range(self.tableWidget.rowCount()):
-                email = self.tableWidget.item(row, 1).text()
+                email = self.tableWidget.item(row, 1).text() if self.tableWidget.item(row, 1) else ''
                 new_rule = {}
                 new_rule['rule_name'] = self.tableWidget.item(row, 0).text() if self.tableWidget.item(row, 0) else ''
                 new_rule['subject_contains'] = self.tableWidget.item(row, 2).text() if self.tableWidget.item(row,

@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 import time
 from threading import Thread, Lock
 from queue import Queue
-from main_functions import save_config, message_queue, config_file, get_cert_names, gather_mail, send_mail, validate_email, check_time, add_to_startup, config_path, config, EdoWindow, is_file_locked, agregate_edo_messages, monitor_inbox_periodically, DMThread
+from main_functions import save_config, message_queue, save_processed_items, config_file, get_cert_names, gather_mail, send_mail, validate_email, check_time, add_to_startup, config_path, config, EdoWindow, is_file_locked, agregate_edo_messages, monitor_inbox_periodically, DMThread
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import pythoncom
@@ -350,6 +350,8 @@ class MainWindow(QMainWindow):
         dialog = DownloadMasterWindow(self)
         if dialog.exec_() == QDialog.Accepted:
             self.config = dialog.new_config
+            if config['mail_rules']!=dialog.new_config['mail_rules']:
+                save_processed_items(set())
             self.save_params()
 
 
