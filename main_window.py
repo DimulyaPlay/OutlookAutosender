@@ -1,6 +1,8 @@
 import glob
+import shutil
 import sys
 import os
+import tempfile
 import traceback
 from PyQt5.QtWidgets import QMainWindow, QLabel, QLineEdit, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget, \
     QCheckBox, QGroupBox, QComboBox, QPlainTextEdit, QSpinBox, QTimeEdit, QToolButton, QFileDialog,\
@@ -12,7 +14,7 @@ from datetime import datetime, timedelta
 import time
 from threading import Thread, Lock
 from queue import Queue
-from main_functions import save_config, message_queue, save_processed_items, config_file, get_cert_names, gather_mail, send_mail, validate_email, check_time, add_to_startup, config_path, config, EdoWindow, is_file_locked, agregate_edo_messages, monitor_inbox_periodically, DMThread
+from main_functions import save_config, is_soed_available, upload_soed_message_report, get_soed_message_archive, get_soed_message_list, message_queue, save_processed_items, config_file, get_cert_names, gather_mail, send_mail, validate_email, check_time, add_to_startup, config_path, config, EdoWindow, is_file_locked, agregate_edo_messages, monitor_inbox_periodically, DMThread
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 import pythoncom
@@ -27,6 +29,8 @@ class MainWindow(QMainWindow):
         self.download_queue = Queue()
         self.connection_window = None
         self.edo_window = None
+        self.observer = None
+        self.soed_available = False
         ui_file = 'UI/main_2.ui'
         uic.loadUi(ui_file, self)
         icon = QIcon("UI/icons8-carrier-pigeon-64.png")
@@ -113,11 +117,20 @@ class MainWindow(QMainWindow):
         pushButton_setup_dm. clicked.connect(self.open_dm_settings)
         autorun = self.findChild(QCheckBox, 'checkBox_autorun')
         autorun.clicked.connect(add_to_startup)
-        self.event_handler = MyHandler(self)
-        self.observer = Observer()
-        self.directory_to_watch = self.config['lineedit_input_edo']
-        self.update_interval = 1000
-        self.observer.schedule(self.event_handler, path=self.directory_to_watch, recursive=False)
+        if config['checkBox_autosend_edo']:
+            if os.path.isdir(self.config['lineedit_input_edo']):
+                self.event_handler = MyHandler(self)
+                self.observer = Observer()
+                self.directory_to_watch = self.config['lineedit_input_edo']
+                self.update_interval = 1000
+                self.observer.schedule(self.event_handler, path=self.directory_to_watch, recursive=False)
+            elif is_soed_available(self.config['lineedit_input_edo']):
+                self.soed_available = True
+                self.soed_thread = SoEdThread()
+                self.soed_thread.start()
+            else:
+                self.add_log_message('Отправка СО ЭД включена, но ни один из способов работы не доступен.')
+
         self.autostart_timer = QTimer(self)
         self.autostart_timer.timeout.connect(self.toggleScheduler)
         if config['checkBox_autosend_edo'] or config['checkBox_start_dm']:
@@ -313,7 +326,7 @@ class MainWindow(QMainWindow):
                 if not file_list:
                     self.add_log_message(f'Писем не обнаружено')
                     return
-            res = agregate_edo_messages(file_list)
+            res, reports = agregate_edo_messages(file_list)
             if isinstance(res, str):
                 self.add_log_message(f'Эл. письма из СО ЭД отправлены')
                 self.add_log_message(res)
@@ -333,8 +346,12 @@ class MainWindow(QMainWindow):
                 download_master.start()
                 self.add_log_message(f'Мониторинг ссылок для скачивания включен.')
             if config['checkBox_autosend_edo']:
-                self.observer.start()
-                self.add_log_message(f'Наблюдение за директорией "{self.directory_to_watch}" и мониторинг входящих включены.')
+                if self.observer:
+                    self.observer.start()
+                    self.add_log_message(f'Наблюдение за директорией "{self.directory_to_watch}" и мониторинг входящих включены.')
+                if self.soed_available:
+
+                    self.add_log_message(f'Проверка исходящих и входящих СО ЭД включены.')
         except Exception as e:
             traceback.print_exc()
             self.add_log_message(f'Ошибка запуска мониторинга, {e}')
@@ -350,7 +367,7 @@ class MainWindow(QMainWindow):
         dialog = DownloadMasterWindow(self)
         if dialog.exec_() == QDialog.Accepted:
             self.config = dialog.new_config
-            if config['mail_rules']!=dialog.new_config['mail_rules']:
+            if config['mail_rules'] != dialog.new_config['mail_rules']:
                 save_processed_items(set())
             self.save_params()
 
@@ -393,6 +410,30 @@ class MyHandler(FileSystemEventHandler):
                 print(dest_path)
                 self.add_file(dest_path)
 
+    def on_created(self, event):
+        super().on_created(event)
+        if not event.is_directory and event.src_path.endswith('.zip'):
+            self.handle_new_file(event.src_path)
+
+    def on_modified(self, event):
+        super().on_modified(event)
+        if not event.is_directory and event.src_path.endswith('.zip'):
+            self.handle_new_file(event.src_path)
+
+    def handle_new_file(self, file_path):
+        Thread(target=self.check_if_file_is_ready, args=(file_path,), daemon=True).start()
+
+    def check_if_file_is_ready(self, file_path):
+        previous_size = -1
+        while True:
+            current_size = os.path.getsize(file_path)
+            if current_size == previous_size:
+                # Файл больше не увеличивается в размере, считаем его готовым
+                self.add_file(file_path)
+                break
+            previous_size = current_size
+            time.sleep(1)  # Проверяем размер файла каждые 1 секунду
+
 
 class QueueMonitorThread(QThread):
     message_signal = pyqtSignal(str)
@@ -403,3 +444,25 @@ class QueueMonitorThread(QThread):
             if message is None:
                 break
             self.message_signal.emit(message)
+
+
+class SoEdThread(QThread):
+    def run(self):
+        while True:
+            messages_list = get_soed_message_list(config['lineedit_input_edo'])
+            if messages_list:
+                message_queue.put(f'Найдены сообщения: {messages_list}')
+            for message in messages_list:
+                tmpdir = tempfile.mkdtemp()
+                message_queue.put(f'Начата работа с сообщением {message}')
+                filepath = get_soed_message_archive(config['lineedit_input_edo'], message, tmpdir)
+                message_queue.put(f'Архив сообщения {message} получен: {filepath}')
+                res, report = agregate_edo_messages([filepath], tmpdir)
+                message_queue.put(f'Сообщение {message} отправлено, отчет {report} сформирован')
+                res = upload_soed_message_report(config['lineedit_input_edo'], report[0])
+                if not res:
+                    message_queue.put(f'Отчет для сообщения {message} загружен в СО ЭД')
+                else:
+                    message_queue.put(f'Ошибка при загрузке отчета {message} в СО ЭД')
+                shutil.rmtree(tmpdir)
+            time.sleep(60)

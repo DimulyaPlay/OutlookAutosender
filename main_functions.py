@@ -1,6 +1,8 @@
 import json
 import os
 import shutil
+import tempfile
+import traceback
 from traceback import print_exc
 import msvcrt
 from glob import glob
@@ -20,10 +22,15 @@ import winreg
 import win32print
 import random
 import pythoncom
+from uuid import uuid4
 from PyPDF2 import PdfReader, PdfWriter
 from threading import Thread, Lock
 from urllib.request import getproxies
+import requests
 from queue import Queue
+import urllib3
+
+urllib3.disable_warnings()
 
 
 def save_config(config_file, config):
@@ -236,12 +243,13 @@ def gather_mail():
     return groups_for_send, groups_filenames
 
 
-def agregate_edo_messages(current_filelist):
+def agregate_edo_messages(current_filelist, tmpdir=''):
     try:
         pythoncom.CoInitialize()
         outlook = win32com.client.Dispatch('Outlook.Application')
         namespace = outlook.GetNamespace('MAPI')
         sent_files = []
+        reports = []
         for archive in current_filelist:
             foldername_extracted = archive[:-4]
             if os.path.exists(foldername_extracted):
@@ -253,7 +261,6 @@ def agregate_edo_messages(current_filelist):
                 meta = json.load(metafile)
             subject = f'-{meta["id"]}] {meta["subject"]}' if meta['subject'] else f'-{meta["id"]}] {os.path.basename(archive)}'
             body_text = meta['body'] + '\n' + "Список направляемых файлов:" + '\n\n' + "\n".join(zip_filelist)
-            [os.remove(fp) for fp in glob(ReportsPrinted + "\\" + '*.pdf')]
             if meta['rr']:
                 att_enc = encode_file(archive)
                 subject_rr = f"[rr-{meta['thread']}{subject}"
@@ -273,6 +280,9 @@ def agregate_edo_messages(current_filelist):
                     sent_files.append(f'В РР отправлены файлы: {", ".join(meta["fileNames"])}')
                 except Exception as e:
                     sent_files.append(f'Ошибка отправки в РР: {e}')
+                pdf_report_rr = os.path.join(tmpdir if tmpdir else config['lineedit_output_edo'], f'report-{meta["thread"]}-{meta["id"]}-rr.zip')
+                sent_files.extend(gather_report_from_sent_items(namespace, subject_rr, pdf_report_rr))
+                reports.append(pdf_report_rr)
             if meta['emails']:
                 subject_eml = f"[tid-{meta['thread']}{subject}"
                 attachments = [os.path.join(foldername_extracted, fileName) for fileName in meta['fileNames']]
@@ -295,16 +305,20 @@ def agregate_edo_messages(current_filelist):
                     sent_files.append(f'В адреса {meta["emails"]} отправлены файлы: {", ".join(meta["fileNames"])}')
                 except Exception as e:
                     sent_files.append(f'Ошибка отправки: {e}')
-                pdf_report = os.path.join(config['lineedit_output_edo'], f'report-{meta["thread"]}-{meta["id"]}-eml.zip')
+                pdf_report = os.path.join(tmpdir if tmpdir else config['lineedit_output_edo'], f'report-{meta["thread"]}-{meta["id"]}-eml.zip')
                 sent_files.extend(gather_report_from_sent_items(namespace, subject_eml, pdf_report))
+                reports.append(pdf_report)
             shutil.rmtree(foldername_extracted)
-            shutil.move(archive, os.path.join(config['lineedit_input_edo'], 'sent', os.path.basename(archive)))
+            if not tmpdir:
+                shutil.move(archive, os.path.join(config['lineedit_input_edo'], 'sent', os.path.basename(archive)))
+            else:
+                os.unlink(archive)
         if not sent_files:
-            return 0
-        return '\n'.join(sent_files)
+            return 0, []
+        return '\n'.join(sent_files), reports
     except:
         print_exc()
-        return -1
+        return -1, []
     finally:
         pythoncom.CoUninitialize()
 
@@ -345,6 +359,7 @@ def gather_report_from_sent_items(namespace, tracked_msg_subject, msg_report):
 
 def check_inbox_for_responses(namespace, config, download_queue):
     try:
+        soed_available = is_soed_available(config['lineedit_input_edo'])
         processed_items = load_processed_items()
         downloaded_items = load_downloaded_items()
         inbox_folder = namespace.GetDefaultFolder(6)  # Папка "Входящие"
@@ -361,11 +376,26 @@ def check_inbox_for_responses(namespace, config, download_queue):
                         thread_id = match.group(1)
                         unique_id = match.group(2)
                         pattern_extracted = f'{thread_id}-{unique_id}'
-                        zip_path = os.path.join(config['lineedit_output_edo'], f'response-{pattern_extracted}.zip')
-                        save_msg_to_zip(item, zip_path)
-                        print(f'Сообщение и вложения сохранены в архив: {zip_path}')
-                        processed_items.add(item.EntryID)
-                        save_processed_items(processed_items)  # Обновляем файл после добавления нового сообщения
+                        if soed_available:
+                            outpath = tempfile.mkdtemp()
+                        else:
+                            outpath = config['lineedit_output_edo']
+                        if item.Subject.startswith('Не удается доставить:'):
+                            zip_path = os.path.join(outpath, f'declined-{pattern_extracted}.zip')
+                        else:
+                            zip_path = os.path.join(outpath, f'response-{pattern_extracted}.zip')
+                        res = save_msg_to_zip(item, zip_path)
+                        if not res:
+                            print(f'Сообщение и вложения сохранены в архив: {zip_path}')
+                            if soed_available:
+                                res = upload_soed_message_report(config['lineedit_input_edo'], zip_path)
+                                if not res:
+                                    processed_items.add(item.EntryID)
+                                    save_processed_items(processed_items)  # Обновляем файл после добавления нового сообщения
+                            else:
+                                processed_items.add(item.EntryID)
+                                save_processed_items(
+                                    processed_items)  # Обновляем файл после добавления нового сообщения
                 if config['checkBox_start_dm']:
                     sender_email = resolve_sender_email_address(item)
                     if sender_email in config['mail_rules'].keys():
@@ -424,41 +454,55 @@ def resolve_sender_email_address(item):
 
 def resolve_recipients_email_address(item):
     addresses = []
-    for x in item.Recipients:
-        try:
-            addresses.append(x.AddressEntry.GetExchangeUser().PrimarySmtpAddress)
-        except AttributeError:
-            addresses.append(x.AddressEntry.Address)
-    return addresses
+    try:
+        for x in item.Recipients:
+            try:
+                addresses.append(x.AddressEntry.GetExchangeUser().PrimarySmtpAddress)
+            except AttributeError:
+                addresses.append(x.AddressEntry.Address)
+        return addresses
+    except:
+        return ' '
+
+
+def resolve_date(item):
+    try:
+        return item.ReceivedTime.strftime("%Y-%m-%d %H:%M:%S")
+    except:
+        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
 def save_msg_to_zip(item, zip_name):
-    temp_dir = zip_name[:-4]
-    os.makedirs(temp_dir, exist_ok=True)
-    meta = {
-        'date': item.ReceivedTime.strftime("%Y-%m-%d %H:%M:%S"),
-        'sender': resolve_sender_email_address(item),
-        'recipients': resolve_recipients_email_address(item),
-        'subject': item.Subject,
-        'attachments': {},
-        'body': item.Body
-    }
-    for att in item.Attachments:
-        file_uuid = str(uuid4()) + '.' + att.FileName.split('.')[-1]
-        file_path = os.path.join(temp_dir, file_uuid)
-        att.SaveAsFile(file_path)
-        meta['attachments'][file_uuid] = att.FileName
-    meta_path = os.path.join(temp_dir, 'meta.json')
-    with open(meta_path, 'w', encoding='utf-8') as meta_file:
-        json.dump(meta, meta_file, ensure_ascii=False, indent=4)
-    zip_path = zip_name
-    with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-        zipf.write(meta_path, os.path.basename(meta_path))
-        for file_uuid, original_name in meta['attachments'].items():
+    try:
+        temp_dir = zip_name[:-4]
+        os.makedirs(temp_dir, exist_ok=True)
+        meta = {
+            'date': resolve_date(item),
+            'sender': resolve_sender_email_address(item),
+            'recipients': resolve_recipients_email_address(item),
+            'subject': item.Subject,
+            'attachments': {},
+            'body': item.Body
+        }
+        for att in item.Attachments:
+            file_uuid = str(uuid4()) + '.' + att.FileName.split('.')[-1]
             file_path = os.path.join(temp_dir, file_uuid)
-            zipf.write(file_path, file_uuid)
-    shutil.rmtree(temp_dir)
-    print(f'Сообщение и вложения сохранены в архив: {zip_path}')
+            att.SaveAsFile(file_path)
+            meta['attachments'][file_uuid] = att.FileName
+        meta_path = os.path.join(temp_dir, 'meta.json')
+        with open(meta_path, 'w', encoding='utf-8') as meta_file:
+            json.dump(meta, meta_file, ensure_ascii=False, indent=4)
+        zip_path = zip_name
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            zipf.write(meta_path, os.path.basename(meta_path))
+            for file_uuid, original_name in meta['attachments'].items():
+                file_path = os.path.join(temp_dir, file_uuid)
+                zipf.write(file_path, file_uuid)
+        shutil.rmtree(temp_dir)
+        return 0
+    except:
+        print_exc()
+        return 1
 
 
 def monitor_inbox_periodically(namespace, config, download_queue):
@@ -497,7 +541,8 @@ def send_mail(attachments, manual=True):
         shutil.move(orig_att, config['lineEdit_put_path'])
         if config['checkBox_use_encryption']:
             os.unlink(att)
-    message.Body = config['plainTextEdit_body']+"\n"+"Список направляемых документов:"+"\n"+"\n".join(attachments_list)
+    body_text = config['plainTextEdit_body'] if not attachments_list else config['plainTextEdit_body']+"\n\n\n"+"Список направляемых документов:\n"+"\n".join(attachments_list)
+    message.Body = body_text
     for r in recipients:
         if validate_email(r):
             recipient = message.Recipients.Add(r)
@@ -622,7 +667,7 @@ def download_wget(kuvi_link, kuvi_path):
         command.append('--no-check-certificate')
         command.append('--tries=3')
         command.extend(["-O", temp_path, kuvi_link])
-        subprocess.run(command, check=True)
+        subprocess.run(command, check=True, creationflags=subprocess.CREATE_NO_WINDOW)
     except:
         print_exc()
         return 1
@@ -638,6 +683,65 @@ def safe_filename(filename):
         return filename
     else:
         return get_timestamp_date()
+
+
+def is_soed_available(address):
+    try:
+        response = requests.get(address+'/ext/get-msg-messages_oa', proxies={'http': None, 'https': None}, verify=False)
+        if response.status_code == 200:
+            return 1
+        else:
+            return 0
+    except:
+        return 0
+
+
+def get_soed_message_list(address):
+    try:
+        response = requests.get(address+'/ext/get-msg-messages_oa', proxies={'http': None, 'https': None}, verify=False).json()
+        messages_list = response.get('messages')
+        return messages_list
+    except:
+        traceback.print_exc()
+        return []
+
+
+def get_soed_message_archive(address, msg_id, tmpdir):
+    try:
+        params = {'message_id': msg_id}
+        response = requests.get(address + '/ext/get-msg-file', params=params, proxies={'http': None, 'https': None},
+                                verify=False)
+        filename = response.headers['Content-Disposition'].split('filename=')[-1]
+        zip_path = os.path.join(tmpdir, filename)
+        with open(zip_path, 'wb') as f:
+            f.write(response.content)
+        return zip_path
+    except:
+        print_exc()
+        return None
+
+
+def upload_soed_message_report(address, filepath):
+    try:
+        if not os.path.isfile(filepath):
+            print('Файл не существует:', filepath)
+            return 1
+        upload_address = address + '/ext/upload-msg-report'
+        with open(filepath, 'rb') as report_file:
+            files = {'file': (os.path.basename(filepath), report_file, 'application/zip')}
+            params = {'filename': os.path.basename(filepath)}
+
+            response = requests.post(upload_address, files=files, params=params, verify=False,
+                                     proxies={"http": None, "https": None}, timeout=60)
+            if response.status_code == 200:
+                return 0
+            else:
+                print(f"Failed to upload report. Status code: {response.status_code}")
+                return 1
+    except Exception as e:
+        print(f"Ошибка при выполнении запроса: {e}")
+        traceback.print_exc()
+        return 1
 
 
 class EdoWindow(QDialog):
@@ -696,3 +800,5 @@ class DMThread(Thread):
             except Exception as e:
                 print_exc()
                 print(f'Ошибка в процессе обработки: {e}')
+
+
