@@ -45,6 +45,10 @@ if not os.path.exists(config_path):
     os.mkdir(config_path)
 config_file = os.path.join(config_path, 'config.json')
 message_queue = Queue()
+temp_path = os.path.join(os.getcwd(), temp)
+shutil.rmtree(temp_path)
+os.mkdir(temp_path)
+
 
 def load_or_create_default_config(config_file):
     default_configuration = {
@@ -213,47 +217,52 @@ def gather_mail():
 
 
 def send_mail(attachments, manual=True):
-    recipients = config['lineEdit_recipients'].split(";")
-    if not recipients:
-        print('Получатели не обнаружены')
-        return
-    outlook = win32com.client.Dispatch('Outlook.Application')
-    namespace = outlook.GetNamespace('MAPI')
-    message = outlook.CreateItem(0)
-    message.Subject = config['lineEdit_subject']
-    attachments_list = []
-    for main_num, att in enumerate(attachments):
-        if att.endswith('zip'):
-            with zipfile.ZipFile(att, 'r') as zipObj:
-                attachments_list.extend([f'{main_num+1}.{num + 1}. {zipf.filename}' for num, zipf in enumerate(zipObj.filelist)])
-        else:
-            attachments_list.append(f"{main_num+1}. {os.path.basename(att)}")
-        orig_att = att
-        if config['checkBox_use_encryption']:
+    try:
+        recipients = config['lineEdit_recipients'].split(";")
+        if not recipients:
+            print('Получатели не обнаружены')
+            return
+        outlook = win32com.client.Dispatch('Outlook.Application')
+        namespace = outlook.GetNamespace('MAPI')
+        message = outlook.CreateItem(0)
+        message.Subject = config['lineEdit_subject']
+        attachments_list = []
+        for main_num, att in enumerate(attachments):
+            if att.endswith('zip'):
+                with zipfile.ZipFile(att, 'r') as zipObj:
+                    attachments_list.extend([f'{main_num+1}.{num + 1}. {zipf.filename}' for num, zipf in enumerate(zipObj.filelist)])
+            else:
+                attachments_list.append(f"{main_num+1}. {os.path.basename(att)}")
             orig_att = att
-            att = encode_file(att)
-        temp_filepath = os.path.join(temp_path, os.path.basename(att))
-        shutil.copy(att, temp_filepath)
-        message.Attachments.Add(temp_filepath)
-        os.unlink(temp_filepath)
-        shutil.move(orig_att, config['lineEdit_put_path'])
+            if config['checkBox_use_encryption']:
+                orig_att = att
+                att = encode_file(att)
+            temp_filepath = os.path.join(temp_path, os.path.basename(att))
+            shutil.copy(att, temp_filepath)
+            message.Attachments.Add(temp_filepath)
+            os.unlink(temp_filepath)
+            shutil.move(orig_att, config['lineEdit_put_path'])
+        body_text = config['plainTextEdit_body'] if not attachments_list else config['plainTextEdit_body']+"\n\n\n"+"Список направляемых документов:\n"+"\n".join(attachments_list)
+        message.Body = body_text
+        for r in recipients:
+            if validate_email(r):
+                recipient = message.Recipients.Add(r)
+                recipient.Type = 1
+        sender = namespace.CreateRecipient(namespace.CurrentUser.Address)
+        sender.Resolve()
+        message.SendUsingAccount = sender
+        if manual:
+            message.Display()
+        else:
+            message.Send()
+        del outlook
         if config['checkBox_use_encryption']:
             os.unlink(att)
-    body_text = config['plainTextEdit_body'] if not attachments_list else config['plainTextEdit_body']+"\n\n\n"+"Список направляемых документов:\n"+"\n".join(attachments_list)
-    message.Body = body_text
-    for r in recipients:
-        if validate_email(r):
-            recipient = message.Recipients.Add(r)
-            recipient.Type = 1
-    sender = namespace.CreateRecipient(namespace.CurrentUser.Address)
-    sender.Resolve()
-    message.SendUsingAccount = sender
-    if manual:
-        message.Display()
-    else:
-        message.Send()
-    del outlook
-
+    except:
+        error_txt_path = os.path.splitext(orig_att)[0] + ".txt"
+        with open(error_txt_path, "w", encoding="utf-8") as f:
+            body_text = config['plainTextEdit_body'] if not attachments_list else config['plainTextEdit_body']+"\n\n\n"+"Список направляемых документов:\n"+"\n".join(attachments_list)
+            f.write(body_text)
 
 def validate_email(email):
     # Регулярное выражение для проверки формата email-адреса

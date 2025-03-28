@@ -234,7 +234,6 @@ class MainWindow(QMainWindow):
             except Exception as e:
                 exc_type, exc_value, exc_traceback = sys.exc_info()
                 traceback_str = ''.join(traceback.format_exception(exc_type, exc_value, exc_traceback))
-                sent_files = ', '.join([os.path.basename(fp) for fp in message_attachments])
                 self.add_log_message(f'ОШИБКА отправки файлов: {message_attachments}')
                 self.add_log_message(traceback_str)
                 traceback.print_exc()
