@@ -7,8 +7,7 @@ from main_functions import *
 from main_window import MainWindow
 import traceback
 
-# C:/Users/CourtUser/Desktop/release/OutlookAutosender/venv/Scripts/pyinstaller.exe --noconfirm --onedir --console --icon "C:/Users/CourtUser/Desktop/release/OutlookAutosender/icons8-carrier-pigeon-64.ico" --add-data "C:/Users/CourtUser/Desktop/release/OutlookAutosender/ReportsPrinted;ReportsPrinted" --add-data "C:/Users/CourtUser/Desktop/release/OutlookAutosender/wget;wget" --add-data "C:/Users/CourtUser/Desktop/release/OutlookAutosender/UI;UI" --add-data "C:/Users/CourtUser/Desktop/release/OutlookAutosender/readme.txt;." "C:/Users/CourtUser/Desktop/release/OutlookAutosender/OutlookAutosender.py"
-
+# venv/Scripts/pyinstaller.exe --noconfirm --onedir --console --icon "icons8-carrier-pigeon-64.ico" --add-data "UI;UI" --add-data "readme.txt;." --add-data "update.cfg;." --add-data "update.exe;." OutlookAutosender.py
 logging.getLogger("PyQt5").setLevel(logging.WARNING)
 log_path = os.path.join(os.path.dirname(sys.argv[0]), 'log.log')
 logging.basicConfig(filename=log_path, level=logging.ERROR)
@@ -45,4 +44,5 @@ if __name__ == '__main__':
         main_ui = MainWindow(config)
         sys.exit(app.exec_())
     except:
+        traceback.print_exc()
         logging.exception('Непредвиденная ошибка во время работы')

@@ -64,12 +64,14 @@ class MainWindow(QMainWindow):
         for obj, param in self.config.items():
             if obj.startswith('lineEdit'):
                 qtobj = self.findChild(QLineEdit, obj)
-                qtobj.setText(param)
-                qtobj.textChanged.connect(self.save_params)
+                if qtobj:
+                    qtobj.setText(param)
+                    qtobj.textChanged.connect(self.save_params)
             elif obj.startswith('checkBox'):
                 qtobj = self.findChild(QWidget, obj)
-                qtobj.setChecked(param)
-                qtobj.stateChanged.connect(self.save_params)
+                if qtobj:
+                    qtobj.setChecked(param)
+                    qtobj.stateChanged.connect(self.save_params)
         toolButton_lineEdit_get_path = self.findChild(QToolButton, 'toolButton_lineEdit_get_path')
         toolButton_lineEdit_get_path.clicked.connect(lambda: self.set_user_dir('lineEdit_get_path'))
         toolButton_lineEdit_put_path = self.findChild(QToolButton, 'toolButton_lineEdit_put_path')
@@ -204,10 +206,12 @@ class MainWindow(QMainWindow):
         for obj, param in self.config.items():
             if obj.startswith('lineEdit'):
                 qtobj = self.findChild(QLineEdit, obj)
-                self.config[obj] = qtobj.text()
+                if qtobj:
+                    self.config[obj] = qtobj.text()
             elif obj.startswith('checkBox'):
                 qtobj = self.findChild(QWidget, obj)
-                self.config[obj] = qtobj.isChecked()
+                if qtobj:
+                    self.config[obj] = qtobj.isChecked()
         self.config['comboBox_certs'] = self.comboBox_certs.currentText()
         self.config['plainTextEdit_body'] = self.plainTextEdit_body.toPlainText()
         self.config['spinBox_max_attach_weight'] = self.spinBox_max_attach_weight.value()

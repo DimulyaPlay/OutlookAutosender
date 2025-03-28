@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>448</width>
-    <height>909</height>
+    <height>820</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -27,432 +27,7 @@
     <property name="bottomMargin">
      <number>3</number>
     </property>
-    <item row="11" column="3">
-     <widget class="QPushButton" name="pushButton_log">
-      <property name="text">
-       <string>Открыть лог</string>
-      </property>
-     </widget>
-    </item>
-    <item row="4" column="0" colspan="4">
-     <widget class="QGroupBox" name="groupBox_4">
-      <property name="sizePolicy">
-       <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
-        <horstretch>0</horstretch>
-        <verstretch>0</verstretch>
-       </sizepolicy>
-      </property>
-      <property name="title">
-       <string>Режимы работы по расписанию</string>
-      </property>
-      <property name="alignment">
-       <set>Qt::AlignCenter</set>
-      </property>
-      <property name="flat">
-       <bool>true</bool>
-      </property>
-      <layout class="QGridLayout" name="gridLayout_4">
-       <property name="leftMargin">
-        <number>3</number>
-       </property>
-       <property name="topMargin">
-        <number>3</number>
-       </property>
-       <property name="rightMargin">
-        <number>3</number>
-       </property>
-       <property name="bottomMargin">
-        <number>3</number>
-       </property>
-       <property name="spacing">
-        <number>2</number>
-       </property>
-       <item row="1" column="2">
-        <widget class="QLineEdit" name="lineEdit_schedule">
-         <property name="placeholderText">
-          <string>13:10,17:20</string>
-         </property>
-        </widget>
-       </item>
-       <item row="0" column="2">
-        <widget class="QTimeEdit" name="timeEdit_send_period">
-         <property name="minimumTime">
-          <time>
-           <hour>0</hour>
-           <minute>1</minute>
-           <second>0</second>
-          </time>
-         </property>
-         <property name="displayFormat">
-          <string>H часов mm минут</string>
-         </property>
-         <property name="time">
-          <time>
-           <hour>1</hour>
-           <minute>0</minute>
-           <second>0</second>
-          </time>
-         </property>
-        </widget>
-       </item>
-       <item row="0" column="0" colspan="2">
-        <widget class="QCheckBox" name="checkBox_periodic">
-         <property name="toolTip">
-          <string>Режим отправки через заданный промежуток времени</string>
-         </property>
-         <property name="text">
-          <string>Периодический режим, отправлять каждые:</string>
-         </property>
-         <property name="checked">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-       <item row="1" column="0" colspan="2">
-        <widget class="QCheckBox" name="checkBox_schedule">
-         <property name="toolTip">
-          <string>Режим отправки в указанное время</string>
-         </property>
-         <property name="text">
-          <string>Режим расписания (ЧЧ:ММ через &quot;,&quot;)</string>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="0" colspan="3">
-        <widget class="QPushButton" name="pushButton_start_stop_workers">
-         <property name="toolTip">
-          <string>Запустить работу программы в выбранном режиме сейчас</string>
-         </property>
-         <property name="text">
-          <string>Запустить работу в выбранном режиме</string>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </widget>
-    </item>
-    <item row="3" column="0" colspan="4">
-     <widget class="QGroupBox" name="groupBox_5">
-      <property name="sizePolicy">
-       <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
-        <horstretch>0</horstretch>
-        <verstretch>0</verstretch>
-       </sizepolicy>
-      </property>
-      <property name="title">
-       <string>Запуск программы</string>
-      </property>
-      <property name="alignment">
-       <set>Qt::AlignCenter</set>
-      </property>
-      <property name="flat">
-       <bool>true</bool>
-      </property>
-      <layout class="QGridLayout" name="gridLayout_5">
-       <property name="leftMargin">
-        <number>3</number>
-       </property>
-       <property name="topMargin">
-        <number>3</number>
-       </property>
-       <property name="rightMargin">
-        <number>3</number>
-       </property>
-       <property name="bottomMargin">
-        <number>3</number>
-       </property>
-       <property name="spacing">
-        <number>2</number>
-       </property>
-       <item row="1" column="0" colspan="2">
-        <widget class="QCheckBox" name="checkBox_autostart">
-         <property name="toolTip">
-          <string>При автозапуске будет запущена работа в выбранном режиме</string>
-         </property>
-         <property name="text">
-          <string>Запускать работу в заданном режиме при автозапуске</string>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="0">
-        <widget class="QLabel" name="label_7">
-         <property name="toolTip">
-          <string>Дать время на запуск других программ</string>
-         </property>
-         <property name="text">
-          <string>Задержка подключения к Outlook при запуске:</string>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="1">
-        <widget class="QTimeEdit" name="timeEdit_connecting_delay">
-         <property name="toolTip">
-          <string>Дать время на запуск других программ</string>
-         </property>
-         <property name="currentSection">
-          <enum>QDateTimeEdit::MinuteSection</enum>
-         </property>
-         <property name="displayFormat">
-          <string>mm минут ss секунд</string>
-         </property>
-         <property name="time">
-          <time>
-           <hour>0</hour>
-           <minute>0</minute>
-           <second>30</second>
-          </time>
-         </property>
-        </widget>
-       </item>
-       <item row="0" column="0" colspan="2">
-        <widget class="QCheckBox" name="checkBox_autorun">
-         <property name="toolTip">
-          <string>В папке автозагрузки создается ярлык на запуск программы</string>
-         </property>
-         <property name="text">
-          <string>Добавить в автозапуск Windows</string>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </widget>
-    </item>
-    <item row="1" column="0" colspan="4">
-     <widget class="QGroupBox" name="groupBox_3">
-      <property name="sizePolicy">
-       <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
-        <horstretch>0</horstretch>
-        <verstretch>0</verstretch>
-       </sizepolicy>
-      </property>
-      <property name="title">
-       <string>Параметры директорий</string>
-      </property>
-      <property name="alignment">
-       <set>Qt::AlignCenter</set>
-      </property>
-      <property name="flat">
-       <bool>true</bool>
-      </property>
-      <layout class="QGridLayout" name="gridLayout_3">
-       <property name="leftMargin">
-        <number>3</number>
-       </property>
-       <property name="topMargin">
-        <number>3</number>
-       </property>
-       <property name="rightMargin">
-        <number>3</number>
-       </property>
-       <property name="bottomMargin">
-        <number>3</number>
-       </property>
-       <property name="spacing">
-        <number>2</number>
-       </property>
-       <item row="1" column="2">
-        <widget class="QToolButton" name="toolButton_lineEdit_get_path">
-         <property name="text">
-          <string>...</string>
-         </property>
-        </widget>
-       </item>
-       <item row="1" column="0">
-        <widget class="QLabel" name="label_5">
-         <property name="acceptDrops">
-          <bool>false</bool>
-         </property>
-         <property name="toolTip">
-          <string>Место, где программа ищет документы на отправку</string>
-         </property>
-         <property name="text">
-          <string>Откуда брать</string>
-         </property>
-        </widget>
-       </item>
-       <item row="5" column="0" colspan="2">
-        <widget class="QCheckBox" name="checkBox_with_sig_only">
-         <property name="toolTip">
-          <string>Если у файла нет парного файла с .sig на конце, такие файлы будут инорироваться</string>
-         </property>
-         <property name="text">
-          <string>Отправлять только если есть парный .sig файл</string>
-         </property>
-         <property name="checkable">
-          <bool>true</bool>
-         </property>
-         <property name="checked">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-       <item row="1" column="1">
-        <widget class="QLineEdit" name="lineEdit_get_path">
-         <property name="maximumSize">
-          <size>
-           <width>313</width>
-           <height>16777215</height>
-          </size>
-         </property>
-         <property name="toolTip">
-          <string>Место, где программа ищет документы на отправку</string>
-         </property>
-        </widget>
-       </item>
-       <item row="3" column="0" colspan="2">
-        <widget class="QCheckBox" name="checkBox_archive_files">
-         <property name="toolTip">
-          <string>Собирать все подходящие для отправки файлы в один архив</string>
-         </property>
-         <property name="text">
-          <string>Собирать файлы к отправке в один архив</string>
-         </property>
-         <property name="checked">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-       <item row="4" column="1" colspan="2">
-        <widget class="QLineEdit" name="lineEdit_archname">
-         <property name="text">
-          <string/>
-         </property>
-        </widget>
-       </item>
-       <item row="4" column="0">
-        <widget class="QLabel" name="label_10">
-         <property name="text">
-          <string>Название архива: </string>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="0">
-        <widget class="QLabel" name="label_6">
-         <property name="toolTip">
-          <string>Место, куда программа складывает отправленне файлы/архивы</string>
-         </property>
-         <property name="text">
-          <string>Куда класть</string>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="2">
-        <widget class="QToolButton" name="toolButton_lineEdit_put_path">
-         <property name="text">
-          <string>...</string>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="1">
-        <widget class="QLineEdit" name="lineEdit_put_path">
-         <property name="maximumSize">
-          <size>
-           <width>313</width>
-           <height>16777215</height>
-          </size>
-         </property>
-         <property name="toolTip">
-          <string>Место, куда программа складывает отправленне файлы/архивы</string>
-         </property>
-        </widget>
-       </item>
-       <item row="6" column="0" colspan="3">
-        <widget class="QPushButton" name="pushButton_create_mail_now">
-         <property name="toolTip">
-          <string>Сформировать письмо/а для отправки и отобразить их.</string>
-         </property>
-         <property name="text">
-          <string>Отправить файлы из директорий вручную сейчас</string>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </widget>
-    </item>
-    <item row="11" column="1">
-     <spacer name="horizontalSpacer">
-      <property name="orientation">
-       <enum>Qt::Horizontal</enum>
-      </property>
-      <property name="sizeHint" stdset="0">
-       <size>
-        <width>6</width>
-        <height>20</height>
-       </size>
-      </property>
-     </spacer>
-    </item>
-    <item row="5" column="0" colspan="4">
-     <widget class="QGroupBox" name="groupBox">
-      <property name="sizePolicy">
-       <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
-        <horstretch>0</horstretch>
-        <verstretch>0</verstretch>
-       </sizepolicy>
-      </property>
-      <property name="title">
-       <string>Модуль взаимодействия с СО ЭД</string>
-      </property>
-      <property name="alignment">
-       <set>Qt::AlignCenter</set>
-      </property>
-      <property name="flat">
-       <bool>true</bool>
-      </property>
-      <layout class="QGridLayout" name="gridLayout_6">
-       <property name="leftMargin">
-        <number>3</number>
-       </property>
-       <property name="topMargin">
-        <number>3</number>
-       </property>
-       <property name="rightMargin">
-        <number>3</number>
-       </property>
-       <property name="bottomMargin">
-        <number>3</number>
-       </property>
-       <property name="spacing">
-        <number>2</number>
-       </property>
-       <item row="0" column="0">
-        <widget class="QPushButton" name="pushButton_edo">
-         <property name="text">
-          <string>Подключение к СО ЭД</string>
-         </property>
-        </widget>
-       </item>
-       <item row="0" column="1">
-        <widget class="QPushButton" name="pushButto_send_edo_manual">
-         <property name="text">
-          <string>Отправить пакеты СО ЭД вручную</string>
-         </property>
-        </widget>
-       </item>
-       <item row="1" column="0" colspan="2">
-        <widget class="QCheckBox" name="checkBox_autosend_edo">
-         <property name="text">
-          <string>Отправлять пакеты СО ЭД при обнаружении (требуется перезапуск)</string>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </widget>
-    </item>
-    <item row="11" column="0">
-     <widget class="QLabel" name="label_9">
-      <property name="text">
-       <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Разработка &lt;a href=&quot;https://boosty.to/microrazrab&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0000ff;&quot;&gt;DmirtySosnin&lt;/span&gt;&lt;/a&gt;, иконка от &lt;a href=&quot;https://icons8.ru/&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0000ff;&quot;&gt;icons8&lt;/span&gt;&lt;/a&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-      </property>
-      <property name="textFormat">
-       <enum>Qt::RichText</enum>
-      </property>
-      <property name="openExternalLinks">
-       <bool>true</bool>
-      </property>
-     </widget>
-    </item>
-    <item row="0" column="0" colspan="4">
+    <item row="0" column="0" colspan="3">
      <widget class="QGroupBox" name="groupBox_2">
       <property name="sizePolicy">
        <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
@@ -647,7 +222,342 @@
       </layout>
      </widget>
     </item>
-    <item row="10" column="0" colspan="4">
+    <item row="1" column="0" colspan="3">
+     <widget class="QGroupBox" name="groupBox_3">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="title">
+       <string>Параметры директорий</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+      <property name="flat">
+       <bool>true</bool>
+      </property>
+      <layout class="QGridLayout" name="gridLayout_3">
+       <property name="leftMargin">
+        <number>3</number>
+       </property>
+       <property name="topMargin">
+        <number>3</number>
+       </property>
+       <property name="rightMargin">
+        <number>3</number>
+       </property>
+       <property name="bottomMargin">
+        <number>3</number>
+       </property>
+       <property name="spacing">
+        <number>2</number>
+       </property>
+       <item row="1" column="2">
+        <widget class="QToolButton" name="toolButton_lineEdit_get_path">
+         <property name="text">
+          <string>...</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="0">
+        <widget class="QLabel" name="label_5">
+         <property name="acceptDrops">
+          <bool>false</bool>
+         </property>
+         <property name="toolTip">
+          <string>Место, где программа ищет документы на отправку</string>
+         </property>
+         <property name="text">
+          <string>Откуда брать</string>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="0" colspan="2">
+        <widget class="QCheckBox" name="checkBox_with_sig_only">
+         <property name="toolTip">
+          <string>Если у файла нет парного файла с .sig на конце, такие файлы будут инорироваться</string>
+         </property>
+         <property name="text">
+          <string>Отправлять только если есть парный .sig файл</string>
+         </property>
+         <property name="checkable">
+          <bool>true</bool>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <widget class="QLineEdit" name="lineEdit_get_path">
+         <property name="maximumSize">
+          <size>
+           <width>313</width>
+           <height>16777215</height>
+          </size>
+         </property>
+         <property name="toolTip">
+          <string>Место, где программа ищет документы на отправку</string>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="0" colspan="2">
+        <widget class="QCheckBox" name="checkBox_archive_files">
+         <property name="toolTip">
+          <string>Собирать все подходящие для отправки файлы в один архив</string>
+         </property>
+         <property name="text">
+          <string>Собирать файлы к отправке в один архив</string>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="1" colspan="2">
+        <widget class="QLineEdit" name="lineEdit_archname">
+         <property name="text">
+          <string/>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="0">
+        <widget class="QLabel" name="label_10">
+         <property name="text">
+          <string>Название архива: </string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="0">
+        <widget class="QLabel" name="label_6">
+         <property name="toolTip">
+          <string>Место, куда программа складывает отправленне файлы/архивы</string>
+         </property>
+         <property name="text">
+          <string>Куда класть</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="2">
+        <widget class="QToolButton" name="toolButton_lineEdit_put_path">
+         <property name="text">
+          <string>...</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="1">
+        <widget class="QLineEdit" name="lineEdit_put_path">
+         <property name="maximumSize">
+          <size>
+           <width>313</width>
+           <height>16777215</height>
+          </size>
+         </property>
+         <property name="toolTip">
+          <string>Место, куда программа складывает отправленне файлы/архивы</string>
+         </property>
+        </widget>
+       </item>
+       <item row="6" column="0" colspan="3">
+        <widget class="QPushButton" name="pushButton_create_mail_now">
+         <property name="toolTip">
+          <string>Сформировать письмо/а для отправки и отобразить их.</string>
+         </property>
+         <property name="text">
+          <string>Отправить файлы из директорий вручную сейчас</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item row="3" column="0" colspan="3">
+     <widget class="QGroupBox" name="groupBox_5">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="title">
+       <string>Запуск программы</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+      <property name="flat">
+       <bool>true</bool>
+      </property>
+      <layout class="QGridLayout" name="gridLayout_5">
+       <property name="leftMargin">
+        <number>3</number>
+       </property>
+       <property name="topMargin">
+        <number>3</number>
+       </property>
+       <property name="rightMargin">
+        <number>3</number>
+       </property>
+       <property name="bottomMargin">
+        <number>3</number>
+       </property>
+       <property name="spacing">
+        <number>2</number>
+       </property>
+       <item row="1" column="0" colspan="2">
+        <widget class="QCheckBox" name="checkBox_autostart">
+         <property name="toolTip">
+          <string>При автозапуске будет запущена работа в выбранном режиме</string>
+         </property>
+         <property name="text">
+          <string>Запускать работу в заданном режиме при автозапуске</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="0">
+        <widget class="QLabel" name="label_7">
+         <property name="toolTip">
+          <string>Дать время на запуск других программ</string>
+         </property>
+         <property name="text">
+          <string>Задержка подключения к Outlook при запуске:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="1">
+        <widget class="QTimeEdit" name="timeEdit_connecting_delay">
+         <property name="toolTip">
+          <string>Дать время на запуск других программ</string>
+         </property>
+         <property name="currentSection">
+          <enum>QDateTimeEdit::MinuteSection</enum>
+         </property>
+         <property name="displayFormat">
+          <string>mm минут ss секунд</string>
+         </property>
+         <property name="time">
+          <time>
+           <hour>0</hour>
+           <minute>0</minute>
+           <second>30</second>
+          </time>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="0" colspan="2">
+        <widget class="QCheckBox" name="checkBox_autorun">
+         <property name="toolTip">
+          <string>В папке автозагрузки создается ярлык на запуск программы</string>
+         </property>
+         <property name="text">
+          <string>Добавить в автозапуск Windows</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item row="4" column="0" colspan="3">
+     <widget class="QGroupBox" name="groupBox_4">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="title">
+       <string>Режимы работы по расписанию</string>
+      </property>
+      <property name="alignment">
+       <set>Qt::AlignCenter</set>
+      </property>
+      <property name="flat">
+       <bool>true</bool>
+      </property>
+      <layout class="QGridLayout" name="gridLayout_4">
+       <property name="leftMargin">
+        <number>3</number>
+       </property>
+       <property name="topMargin">
+        <number>3</number>
+       </property>
+       <property name="rightMargin">
+        <number>3</number>
+       </property>
+       <property name="bottomMargin">
+        <number>3</number>
+       </property>
+       <property name="spacing">
+        <number>2</number>
+       </property>
+       <item row="1" column="2">
+        <widget class="QLineEdit" name="lineEdit_schedule">
+         <property name="placeholderText">
+          <string>13:10,17:20</string>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="2">
+        <widget class="QTimeEdit" name="timeEdit_send_period">
+         <property name="minimumTime">
+          <time>
+           <hour>0</hour>
+           <minute>1</minute>
+           <second>0</second>
+          </time>
+         </property>
+         <property name="displayFormat">
+          <string>H часов mm минут</string>
+         </property>
+         <property name="time">
+          <time>
+           <hour>1</hour>
+           <minute>0</minute>
+           <second>0</second>
+          </time>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="0" colspan="2">
+        <widget class="QCheckBox" name="checkBox_periodic">
+         <property name="toolTip">
+          <string>Режим отправки через заданный промежуток времени</string>
+         </property>
+         <property name="text">
+          <string>Периодический режим, отправлять каждые:</string>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="0" colspan="2">
+        <widget class="QCheckBox" name="checkBox_schedule">
+         <property name="toolTip">
+          <string>Режим отправки в указанное время</string>
+         </property>
+         <property name="text">
+          <string>Режим расписания (ЧЧ:ММ через &quot;,&quot;)</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="0" colspan="3">
+        <widget class="QPushButton" name="pushButton_start_stop_workers">
+         <property name="toolTip">
+          <string>Запустить работу программы в выбранном режиме сейчас</string>
+         </property>
+         <property name="text">
+          <string>Запустить работу в выбранном режиме</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </widget>
+    </item>
+    <item row="8" column="0" colspan="3">
      <widget class="QPlainTextEdit" name="plainTextEdit_log">
       <property name="sizePolicy">
        <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
@@ -666,54 +576,37 @@
       </property>
      </widget>
     </item>
-    <item row="6" column="0" colspan="4">
-     <widget class="QGroupBox" name="groupBox_6">
-      <property name="sizePolicy">
-       <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
-        <horstretch>0</horstretch>
-        <verstretch>0</verstretch>
-       </sizepolicy>
+    <item row="9" column="2">
+     <widget class="QPushButton" name="pushButton_log">
+      <property name="text">
+       <string>Открыть лог</string>
       </property>
-      <property name="title">
-       <string>Модуль загрузчика файлов по ссылкам</string>
+     </widget>
+    </item>
+    <item row="9" column="1">
+     <spacer name="horizontalSpacer">
+      <property name="orientation">
+       <enum>Qt::Horizontal</enum>
       </property>
-      <property name="alignment">
-       <set>Qt::AlignCenter</set>
+      <property name="sizeHint" stdset="0">
+       <size>
+        <width>6</width>
+        <height>20</height>
+       </size>
       </property>
-      <property name="flat">
+     </spacer>
+    </item>
+    <item row="9" column="0">
+     <widget class="QLabel" name="label_9">
+      <property name="text">
+       <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Разработка &lt;a href=&quot;https://boosty.to/microrazrab&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0000ff;&quot;&gt;DmirtySosnin&lt;/span&gt;&lt;/a&gt;, иконка от &lt;a href=&quot;https://icons8.ru/&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0000ff;&quot;&gt;icons8&lt;/span&gt;&lt;/a&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+      </property>
+      <property name="textFormat">
+       <enum>Qt::RichText</enum>
+      </property>
+      <property name="openExternalLinks">
        <bool>true</bool>
       </property>
-      <layout class="QGridLayout" name="gridLayout_7">
-       <property name="leftMargin">
-        <number>3</number>
-       </property>
-       <property name="topMargin">
-        <number>3</number>
-       </property>
-       <property name="rightMargin">
-        <number>3</number>
-       </property>
-       <property name="bottomMargin">
-        <number>3</number>
-       </property>
-       <property name="spacing">
-        <number>2</number>
-       </property>
-       <item row="0" column="0">
-        <widget class="QPushButton" name="pushButton_setup_dm">
-         <property name="text">
-          <string>Настройки модуля</string>
-         </property>
-        </widget>
-       </item>
-       <item row="1" column="0">
-        <widget class="QCheckBox" name="checkBox_start_dm">
-         <property name="text">
-          <string>Включить модуль загрузчика (требуется перезапуск)</string>
-         </property>
-        </widget>
-       </item>
-      </layout>
      </widget>
     </item>
    </layout>

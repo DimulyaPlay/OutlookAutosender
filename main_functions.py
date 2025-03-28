@@ -45,7 +45,7 @@ if not os.path.exists(config_path):
     os.mkdir(config_path)
 config_file = os.path.join(config_path, 'config.json')
 message_queue = Queue()
-temp_path = os.path.join(os.getcwd(), temp)
+temp_path = os.path.join(os.getcwd(), 'temp')
 shutil.rmtree(temp_path)
 os.mkdir(temp_path)
 
@@ -71,14 +71,7 @@ def load_or_create_default_config(config_file):
         'lineEdit_schedule': '13:10,17:20',
         'checkBox_autorun': False,
         'checkBox_autostart': False,
-        'timeEdit_connecting_delay': '0:00:30',
-        'lineedit_rr_address': '',
-        'mail_rules': {'noreply-site@rosreestr.ru': [{'rule_name': 'Росреестр 1',
-                                                      'subject_contains': 'о завершении обработки',
-                                                      're_filename': r'<b>(.*?)</b>',
-                                                      're_link': r'<a href="(.*?)">по ссылке</a>',
-                                                      'save_folder': 'C://'}]},
-        'limit_rate': 0
+        'timeEdit_connecting_delay': '0:00:30'
     }
     if not os.path.exists(config_file):
         save_config(config_file, default_configuration)
