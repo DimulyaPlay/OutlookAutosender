@@ -13,7 +13,7 @@ from PyQt5.QtCore import QTimer, QDateTime, QTime, Qt, QThread, pyqtSignal
 from datetime import datetime, timedelta
 import time
 from queue import Queue
-from main_functions import save_config, message_queue, save_processed_items, config_file, get_cert_names, gather_mail, send_mail, validate_email, check_time, add_to_startup, config_path, config, is_file_locked
+from main_functions import save_config, message_queue, config_file, get_cert_names, gather_mail, send_mail, validate_email, check_time, add_to_startup, config_path, config, is_file_locked
 import pythoncom
 import win32com.client
 

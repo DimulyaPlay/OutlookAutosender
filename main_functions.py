@@ -44,7 +44,7 @@ config_path = os.path.dirname(sys.argv[0])
 if not os.path.exists(config_path):
     os.mkdir(config_path)
 config_file = os.path.join(config_path, 'config.json')
-
+message_queue = Queue()
 
 def load_or_create_default_config(config_file):
     default_configuration = {
