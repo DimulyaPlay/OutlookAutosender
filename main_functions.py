@@ -46,7 +46,7 @@ if not os.path.exists(config_path):
 config_file = os.path.join(config_path, 'config.json')
 message_queue = Queue()
 temp_path = os.path.join(os.getcwd(), 'temp')
-shutil.rmtree(temp_path)
+shutil.rmtree(temp_path, True)
 os.mkdir(temp_path)
 
 

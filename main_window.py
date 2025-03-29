@@ -33,12 +33,10 @@ class MainWindow(QMainWindow):
         self.setWindowFlags(self.windowFlags() & ~Qt.WindowMaximizeButtonHint)
         self.setWindowIcon(icon)
         self.running = False
-
         # Создаем и запускаем поток мониторинга очереди
         self.queue_thread = QueueMonitorThread()
         self.queue_thread.message_signal.connect(self.add_log_message)
         self.queue_thread.start()
-
         self.schedule_timers = []
         self.timer = QTimer(self)  # Создание таймера
         def tray_activated(reason):
@@ -99,21 +97,18 @@ class MainWindow(QMainWindow):
         self.start_scheduler = self.findChild(QPushButton, 'pushButton_start_stop_workers')
         self.start_scheduler.clicked.connect(self.toggleScheduler)
         self.start_manual = self.findChild(QPushButton, 'pushButton_create_mail_now')
-        self.start_manual.clicked.connect(lambda: self.send_mail_manual(True))
-        pushButton_connection_settings = self.findChild(QPushButton, 'pushButton_connection_settings')
-        pushButton_connection_settings.setEnabled(False)
+        self.start_manual.clicked.connect(lambda: self.send_mail(manual=True))
         self.plainTextEdit_log = self.findChild(QPlainTextEdit, 'plainTextEdit_log')
         pushButton_log = self.findChild(QPushButton, 'pushButton_log')
         pushButton_log.clicked.connect(lambda: os.startfile(os.path.join(config_path, 'log.log')))
         autorun = self.findChild(QCheckBox, 'checkBox_autorun')
         autorun.clicked.connect(add_to_startup)
-        self.autostart_timer = QTimer(self)
-        self.autostart_timer.timeout.connect(self.toggleScheduler)
         if config['checkBox_autorun'] and config['checkBox_autostart']:
             mm, ss = config['timeEdit_connecting_delay'].split(':')
             secs = int(mm) * 60 + int(ss)
             self.add_log_message(f'Включен автостарт, работа будет запущена через {secs} секунд')
             self.autostart_timer = QTimer(self)
+            self.autostart_timer.setSingleShot(True)
             self.autostart_timer.timeout.connect(self.toggleScheduler)
             self.autostart_timer.start(secs * 1000)
         else:
@@ -121,54 +116,68 @@ class MainWindow(QMainWindow):
 
     def toggleScheduler(self):
         if self.running:
-            self.stopScheduler()  # Остановка всех таймеров
+            self.stopScheduler()
             self.start_scheduler.setText('Запустить работу по расписанию')
             self.running = False
         else:
-            res = self.startScheduler()  # Запуск диспетчера
-            if not res:
-                self.start_scheduler.setText('Остановить работу по расписанию')
-                self.running = True
-            else:
-                self.add_log_message('Запуск задач был отменен из-за ошибок валидации.')
+            if not self.daemon_running:  # Исключаем повторные запуски
+                res = self.startScheduler()
+                if res == 0:  # Успешный запуск
+                    self.start_scheduler.setText('Остановить работу по расписанию')
+                    self.running = True
+                else:
+                    self.add_log_message('Запуск задач отменен из-за ошибок.')
 
     def startScheduler(self):
         errors = self.check_fields(False)
         if errors:
             self.add_log_message('\n'.join(errors))
-            return -1
+            return -1  # Ошибка валидации
         try:
+            self.daemon_running = True  # Флаг активности
             if self.config['checkBox_periodic']:
-                hours, minutes = self.timeEdit_send_period.time().toString('HH:mm').split(':')
-                total_seconds = (int(hours) * 3600 + int(minutes) * 60) * 1000
-                self.timer.start(total_seconds)
-                self.timer.timeout.connect(self.send_mail_manual)
-                self.add_log_message(f'Периодический таймер запущен, запуск задачи каждые {total_seconds} секунд.')
+                period = self.timeEdit_send_period.time().hour() * 3600 + self.timeEdit_send_period.time().minute() * 60
+                if period <= 0:
+                    self.add_log_message('Некорректный период отправки.')
+                    return -1
+                self.timer.setInterval(period * 1000)  # Интервал в миллисекундах
+                self.timer.timeout.connect(self.send_mail)
+                self.timer.start()
+                self.add_log_message(f'Запущен периодический таймер: каждые {period} секунд.')
             if self.config['checkBox_schedule']:
+                now = QTime.currentTime()
                 schedule_times = self.config['lineEdit_schedule'].split(',')
                 for time_str in schedule_times:
+                    time = QTime.fromString(time_str.strip(), "HH:mm")
+                    if not time.isValid():
+                        self.add_log_message(f'Ошибка формата времени: {time_str}')
+                        continue
+                    delay_ms = now.msecsTo(time)
+                    if delay_ms < 0:
+                        delay_ms += 86400000  # Запуск на следующий день
                     timer = QTimer(self)
-                    time = QTime.fromString(time_str, "HH:mm")
-                    now = QTime.currentTime()
-                    if now < time:
-                        milliseconds = now.msecsTo(time)
-                    else:
-                        milliseconds = 86400000 - now.msecsTo(time)  # Перезапуск на следующий день
-                    timer.singleShot(milliseconds, self.send_mail_manual)
-                    self.schedule_timers.append(timer)  # Сохраняем таймеры, чтобы они не удалялись
-                    self.add_log_message(f'Таймер на {time_str} запущен.')
+                    timer.setSingleShot(True)
+                    timer.timeout.connect(self.send_mail)
+                    QTimer.singleShot(delay_ms, lambda t=timer: t.start())  # Избегаем удаления объекта
+                    self.schedule_timers.append(timer)
+                    self.add_log_message(f'Запущен таймер на {time_str}, через {delay_ms / 1000} секунд.')
             self.add_log_message('Работа по расписанию запущена.')
-
+            return 0  # Успешный запуск
         except Exception as e:
             self.add_log_message(f'Ошибка при запуске таймеров: {e}')
+            return -1
 
     def stopScheduler(self):
-        # Остановка всех таймеров
-        self.timer.stop()  # Остановка периодического таймера
+        self.timer.stop()
         for timer in self.schedule_timers:
-            timer.stop()  # Остановка таймеров по расписанию
-        self.schedule_timers.clear()  # Очистка списка таймеров по расписанию
-        self.add_log_message('Работа по расписанию была остановлена пользователем.')
+            timer.stop()
+        self.schedule_timers.clear()
+        self.daemon_running = False
+        self.add_log_message('Работа по расписанию остановлена.')
+
+    def logTimerTriggered(self, timer_index, next_time):
+        self.add_log_message(f'Сработал таймер №{timer_index}, следующий запуск в {next_time.toString("HH:mm")}')
+        self.send_mail()
 
     def hideEvent(self, event):
         event.ignore()
@@ -177,14 +186,6 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         message_queue.put(None)
         sys.exit(0)
-
-    def open_edo_settings(self):
-        self.edo_window = EdoWindow(self.config)
-        res = self.edo_window.exec_()
-        if res:
-            for k, v in self.edo_window.config.items():
-                self.config[k] = v
-            self.save_params()
 
     def hide_to_tray(self):
         self.hide()
@@ -221,7 +222,9 @@ class MainWindow(QMainWindow):
         self.config['checkBox_schedule'] = self.checkBox_schedule.isChecked()
         save_config(config_file, self.config)
 
-    def send_mail_manual(self, manual=False):
+    def send_mail(self, manual=False):
+        self.add_log_message("Сработала отправка почты")
+        return
         errors = self.check_fields(manual)
         if errors:
             self.add_log_message('\n'.join(errors))
