@@ -13,7 +13,7 @@ from PyQt5.QtCore import QTimer, QDateTime, QTime, Qt, QThread, pyqtSignal
 from datetime import datetime, timedelta
 import time
 from queue import Queue
-from main_functions import save_config, message_queue, config_file, get_cert_names, gather_mail, send_mail, validate_email, check_time, add_to_startup, config_path, config, is_file_locked
+from main_functions import save_config, message_queue, config_file, get_cert_names, gather_mail, send_mail, validate_email, check_time, add_to_startup, config_path, config, is_file_locked, send_mail_smtp
 import pythoncom
 import win32com.client
 
@@ -135,15 +135,21 @@ class MainWindow(QMainWindow):
             return -1  # Ошибка валидации
         try:
             self.daemon_running = True  # Флаг активности
+            self.schedule_timers.clear()  # Очищаем старые таймеры
+            self.timer_index = 1  # Устанавливаем счетчик таймеров
+            # Периодический таймер
             if self.config['checkBox_periodic']:
                 period = self.timeEdit_send_period.time().hour() * 3600 + self.timeEdit_send_period.time().minute() * 60
                 if period <= 0:
                     self.add_log_message('Некорректный период отправки.')
                     return -1
+                timer_id = self.timer_index  # Сохраняем номер таймера
                 self.timer.setInterval(period * 1000)  # Интервал в миллисекундах
-                self.timer.timeout.connect(self.send_mail)
+                self.timer.timeout.connect(lambda tid=timer_id, p=period: self.logTimerTriggered(tid, p, periodic=True))
                 self.timer.start()
-                self.add_log_message(f'Запущен периодический таймер: каждые {period} секунд.')
+                self.add_log_message(f'Запущен периодический таймер №{timer_id}: каждые {period} секунд.')
+                self.timer_index += 1
+            # Таймеры по расписанию
             if self.config['checkBox_schedule']:
                 now = QTime.currentTime()
                 schedule_times = self.config['lineEdit_schedule'].split(',')
@@ -155,14 +161,18 @@ class MainWindow(QMainWindow):
                     delay_ms = now.msecsTo(time)
                     if delay_ms < 0:
                         delay_ms += 86400000  # Запуск на следующий день
+                    timer_id = self.timer_index  # Сохраняем номер таймера
                     timer = QTimer(self)
                     timer.setSingleShot(True)
-                    timer.timeout.connect(self.send_mail)
+                    timer.timeout.connect(lambda tid=timer_id, t=time: self.logTimerTriggered(tid, t))
                     QTimer.singleShot(delay_ms, lambda t=timer: t.start())  # Избегаем удаления объекта
                     self.schedule_timers.append(timer)
-                    self.add_log_message(f'Запущен таймер на {time_str}, через {delay_ms / 1000} секунд.')
+                    self.add_log_message(
+                        f'Запущен таймер №{timer_id} на {time.toString("HH:mm")}, через {delay_ms / 1000:.0f} секунд.')
+                    self.timer_index += 1
             self.add_log_message('Работа по расписанию запущена.')
             return 0  # Успешный запуск
+
         except Exception as e:
             self.add_log_message(f'Ошибка при запуске таймеров: {e}')
             return -1
@@ -175,8 +185,13 @@ class MainWindow(QMainWindow):
         self.daemon_running = False
         self.add_log_message('Работа по расписанию остановлена.')
 
-    def logTimerTriggered(self, timer_index, next_time):
-        self.add_log_message(f'Сработал таймер №{timer_index}, следующий запуск в {next_time.toString("HH:mm")}')
+    def logTimerTriggered(self, timer_index, next_time, periodic=False):
+        if periodic:
+            next_run = QTime.currentTime().addSecs(next_time)
+            self.add_log_message(
+                f'Сработал периодический таймер №{timer_index}, следующий запуск в {next_run.toString("HH:mm")}')
+        else:
+            self.add_log_message(f'Сработал таймер №{timer_index}, следующий запуск в {next_time.toString("HH:mm")}')
         self.send_mail()
 
     def hideEvent(self, event):
@@ -223,21 +238,27 @@ class MainWindow(QMainWindow):
         save_config(config_file, self.config)
 
     def send_mail(self, manual=False):
-        self.add_log_message("Сработала отправка почты")
-        return
         errors = self.check_fields(manual)
         if errors:
             self.add_log_message('\n'.join(errors))
             return
         messages, names = gather_mail()
+        if not messages:
+            self.add_log_message(f'Файлы для отправки не найдены')
         for message_attachments, filenames in zip(messages, names):
             try:
-                send_mail(message_attachments, manual=manual)
-                sent_files = ', '.join([os.path.basename(fp) for fp in message_attachments])
-                self.add_log_message(f'Отправлены файлы: {sent_files}')
-                if self.config['checkBox_archive_files']:
-                    sent_file_names = ',\n'.join([os.path.basename(fp) for fp in filenames])
-                    self.add_log_message(f'В архиве {sent_files} содержатся:\n{sent_file_names}')
+                if self.config['use_smtp']:
+                    result, error = send_mail_smtp(message_attachments)
+                else:
+                    result, error = send_mail(message_attachments, manual=manual)
+                if result:
+                    sent_files = ', '.join([os.path.basename(fp) for fp in message_attachments])
+                    self.add_log_message(f'Отправлены файлы: {sent_files}')
+                    if self.config['checkBox_archive_files']:
+                        sent_file_names = ',\n'.join([os.path.basename(fp) for fp in filenames])
+                        self.add_log_message(f'В архиве {sent_files} содержатся:\n{sent_file_names}')
+                else:
+                    self.add_log_message(f'Ошибка: {error}')
             except Exception as e:
                 exc_type, exc_value, exc_traceback = sys.exc_info()
                 traceback_str = ''.join(traceback.format_exception(exc_type, exc_value, exc_traceback))
@@ -282,11 +303,6 @@ class MainWindow(QMainWindow):
                     valid = False
             if not valid:
                 errors.append('Некорректно указано время в расписании')
-        if self.config['checkbox_use_edo']:
-            if not os.path.isdir(self.config['lineedit_input_edo']):
-                errors.append('Некорректный путь для исходящих ЭДО')
-            if not os.path.isdir(self.config['lineedit_output_edo']):
-                errors.append('Некорректный путь для отправленных ЭДО')
         return errors
 
 

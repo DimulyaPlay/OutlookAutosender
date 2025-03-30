@@ -29,6 +29,12 @@ from urllib.request import getproxies
 import requests
 from queue import Queue
 import urllib3
+import smtplib
+import ssl
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.base import MIMEBase
+from email import encoders
 
 urllib3.disable_warnings()
 
@@ -71,7 +77,8 @@ def load_or_create_default_config(config_file):
         'lineEdit_schedule': '13:10,17:20',
         'checkBox_autorun': False,
         'checkBox_autostart': False,
-        'timeEdit_connecting_delay': '0:00:30'
+        'timeEdit_connecting_delay': '0:00:30',
+        'use_smtp': False
     }
     if not os.path.exists(config_file):
         save_config(config_file, default_configuration)
@@ -251,11 +258,14 @@ def send_mail(attachments, manual=True):
         del outlook
         if config['checkBox_use_encryption']:
             os.unlink(att)
-    except:
+        return True, 'Удалось'
+    except Exception as e:
         error_txt_path = os.path.splitext(orig_att)[0] + ".txt"
         with open(error_txt_path, "w", encoding="utf-8") as f:
             body_text = config['plainTextEdit_body'] if not attachments_list else config['plainTextEdit_body']+"\n\n\n"+"Список направляемых документов:\n"+"\n".join(attachments_list)
             f.write(body_text)
+        return False, str(e)
+
 
 def validate_email(email):
     # Регулярное выражение для проверки формата email-адреса
@@ -301,3 +311,76 @@ def create_shortcut(shortcut_path):
     shortcut.TargetPath = sys.argv[0]
     shortcut.WorkingDirectory = os.path.dirname(sys.argv[0])
     shortcut.save()
+
+
+def read_smtp_config(config_path='smtp_credentials.txt'):
+    """Читает параметры SMTP из файла."""
+    config = {}
+    if not os.path.exists(config_path):
+        raise FileNotFoundError(f"Файл конфигурации {config_path} не найден.")
+
+    with open(config_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            key, value = line.strip().split('=', 1)
+            config[key.strip()] = value.strip()
+
+    return config
+
+
+def send_mail_smtp(attachments):
+    """Отправляет письмо с вложениями через SMTP.
+
+    Возвращает:
+        tuple: (success: bool, message: str)
+    """
+    try:
+        smtp_config = read_smtp_config()
+        sender_email = smtp_config['login']
+        password = smtp_config['password']
+        smtp_server = smtp_config['server']
+        smtp_port = int(smtp_config.get('port', 465))
+        use_ssl = smtp_config.get('use_ssl', 'false').lower() == 'true'
+        recipients = config['lineEdit_recipients'].split(";")
+        if not recipients:
+            return False, 'Получатели не обнаружены'
+        msg = MIMEMultipart()
+        msg['From'] = sender_email
+        msg['To'] = ', '.join(recipients)
+        msg['Subject'] = config['lineEdit_subject']
+        attachments_list = []
+        for att in attachments:
+            try:
+                with open(att, 'rb') as f:
+                    part = MIMEBase('application', 'octet-stream')
+                    part.set_payload(f.read())
+                encoders.encode_base64(part)
+                part.add_header('Content-Disposition', f'attachment; filename={os.path.basename(att)}')
+                msg.attach(part)
+                attachments_list.append(os.path.basename(att))
+            except Exception as e:
+                return False, f'Ошибка обработки вложения {att}: {str(e)}'
+        body_text = config['plainTextEdit_body']
+        if attachments_list:
+            body_text += "\n\nСписок направляемых документов:\n" + "\n".join(attachments_list)
+        msg.attach(MIMEText(body_text, 'plain'))
+        timeout = 5
+        if use_ssl:
+            context = ssl.create_default_context()
+            try:
+                with smtplib.SMTP_SSL(smtp_server, smtp_port, context=context, timeout=timeout) as server:
+                    server.login(sender_email, password)
+                    server.sendmail(sender_email, recipients, msg.as_string())
+            except ssl.SSLError as e:
+                return False, f'SSL ошибка: {str(e)}'
+        else:
+            try:
+                with smtplib.SMTP(smtp_server, smtp_port, timeout=timeout) as server:
+                    server.starttls()
+                    server.login(sender_email, password)
+                    server.sendmail(sender_email, recipients, msg.as_string())
+            except smtplib.SMTPException as e:
+                return False, f'SMTP ошибка: {str(e)}'
+        [shutil.move(att, config['lineEdit_put_path']) for att in attachments]
+        return True, "Отправлено успешно"
+    except Exception as e:
+        return False, f'{str(e)}'

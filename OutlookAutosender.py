@@ -1,4 +1,3 @@
-import logging
 from PyQt5 import QtWidgets, QtGui, QtCore
 from PyQt5.QtCore import QTranslator, QLocale, QLibraryInfo
 import os
@@ -8,9 +7,6 @@ from main_window import MainWindow
 import traceback
 
 # venv/Scripts/pyinstaller.exe --noconfirm --onedir --console --icon "icons8-carrier-pigeon-64.ico" --add-data "UI;UI" --add-data "readme.txt;." --add-data "update.cfg;." --add-data "update.exe;." OutlookAutosender.py
-logging.getLogger("PyQt5").setLevel(logging.WARNING)
-log_path = os.path.join(os.path.dirname(sys.argv[0]), 'log.log')
-logging.basicConfig(filename=log_path, level=logging.ERROR)
 
 
 if hasattr(QtCore.Qt, 'AA_EnableHighDpiScaling'):
