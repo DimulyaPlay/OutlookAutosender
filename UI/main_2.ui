@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>448</width>
-    <height>820</height>
+    <width>443</width>
+    <height>998</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -60,37 +60,6 @@
        <property name="spacing">
         <number>2</number>
        </property>
-       <item row="5" column="1">
-        <widget class="QLineEdit" name="lineEdit_csp_path">
-         <property name="maximumSize">
-          <size>
-           <width>282</width>
-           <height>16777215</height>
-          </size>
-         </property>
-         <property name="toolTip">
-          <string>Укажите папку, где находится файл csptest.exe 
-(Место установки КРИПТО ПРО, по умолчанию C:\Program Files\Crypto Pro\CSP)</string>
-         </property>
-         <property name="placeholderText">
-          <string>C:\Program Files\Crypto Pro\CSP</string>
-         </property>
-        </widget>
-       </item>
-       <item row="5" column="0">
-        <widget class="QLabel" name="label">
-         <property name="toolTip">
-          <string>Укажите папку, где находится файл csptest.exe 
-(Место установки КРИПТО ПРО, по умолчанию C:\Program Files\Crypto Pro\CSP)</string>
-         </property>
-         <property name="text">
-          <string>Папка с csptest.exe:</string>
-         </property>
-        </widget>
-       </item>
-       <item row="1" column="1" colspan="2">
-        <widget class="QLineEdit" name="lineEdit_subject"/>
-       </item>
        <item row="3" column="2">
         <widget class="QSpinBox" name="spinBox_max_attach_weight">
          <property name="minimum">
@@ -98,6 +67,26 @@
          </property>
          <property name="value">
           <number>10</number>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="0" colspan="3">
+        <widget class="QCheckBox" name="checkBox_use_encryption">
+         <property name="text">
+          <string>Шифровать файлы сертификатом</string>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="0">
+        <widget class="QLabel" name="label_2">
+         <property name="toolTip">
+          <string>Например: &quot;ivan123@ya.ru;stas@mail.ru;sud@sudf.ru&quot;</string>
+         </property>
+         <property name="text">
+          <string>Адреса доставки через &quot;;&quot;</string>
          </property>
         </widget>
        </item>
@@ -117,67 +106,31 @@
          </property>
         </widget>
        </item>
-       <item row="2" column="1" colspan="2">
-        <widget class="QPlainTextEdit" name="plainTextEdit_body">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Expanding" vsizetype="Minimum">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
+       <item row="5" column="0">
+        <widget class="QLabel" name="label">
+         <property name="toolTip">
+          <string>Укажите папку, где находится файл csptest.exe 
+(Место установки КРИПТО ПРО, по умолчанию C:\Program Files\Crypto Pro\CSP)</string>
          </property>
+         <property name="text">
+          <string>Папка с csptest.exe:</string>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="1" colspan="2">
+        <widget class="QLineEdit" name="lineEdit_csp_path">
          <property name="maximumSize">
           <size>
-           <width>16777215</width>
-           <height>80</height>
+           <width>282</width>
+           <height>16777215</height>
           </size>
          </property>
-        </widget>
-       </item>
-       <item row="5" column="2">
-        <widget class="QToolButton" name="toolButton_lineEdit_csp_path">
-         <property name="text">
-          <string>...</string>
-         </property>
-        </widget>
-       </item>
-       <item row="3" column="0" colspan="2">
-        <widget class="QLabel" name="label_8">
          <property name="toolTip">
-          <string>Когда суммарный вес документов достигает этого значения, письмо отправляется,
-оставшиеся документы начинают формировать новое письмо.</string>
-         </property>
-         <property name="text">
-          <string>Предельный суммарный вес вложений в одном письме, мб:</string>
-         </property>
-        </widget>
-       </item>
-       <item row="4" column="0" colspan="3">
-        <widget class="QCheckBox" name="checkBox_use_encryption">
-         <property name="text">
-          <string>Шифровать файлы сертификатом</string>
-         </property>
-         <property name="checked">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-       <item row="0" column="1" colspan="2">
-        <widget class="QLineEdit" name="lineEdit_recipients">
-         <property name="toolTip">
-          <string>Например: &quot;ivan123@ya.ru;stas@mail.ru;sud@sudf.ru&quot;</string>
+          <string>Укажите папку, где находится файл csptest.exe 
+(Место установки КРИПТО ПРО, по умолчанию C:\Program Files\Crypto Pro\CSP)</string>
          </property>
          <property name="placeholderText">
-          <string>ivan123@ya.ru;stas@mail.ru;sud@sudf.ru</string>
-         </property>
-        </widget>
-       </item>
-       <item row="0" column="0">
-        <widget class="QLabel" name="label_2">
-         <property name="toolTip">
-          <string>Например: &quot;ivan123@ya.ru;stas@mail.ru;sud@sudf.ru&quot;</string>
-         </property>
-         <property name="text">
-          <string>Адреса доставки через &quot;;&quot;</string>
+          <string>C:\Program Files\Crypto Pro\CSP</string>
          </property>
         </widget>
        </item>
@@ -188,7 +141,7 @@
          </property>
         </widget>
        </item>
-       <item row="6" column="1" colspan="2">
+       <item row="6" column="0" colspan="3">
         <widget class="QComboBox" name="comboBox_certs">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
@@ -212,10 +165,57 @@
          </item>
         </widget>
        </item>
-       <item row="6" column="0">
-        <widget class="QPushButton" name="pushButton_connection_settings">
+       <item row="1" column="1" colspan="2">
+        <widget class="QLineEdit" name="lineEdit_subject"/>
+       </item>
+       <item row="3" column="0" colspan="2">
+        <widget class="QLabel" name="label_8">
+         <property name="toolTip">
+          <string>Когда суммарный вес документов достигает этого значения, письмо отправляется,
+оставшиеся документы начинают формировать новое письмо.</string>
+         </property>
          <property name="text">
-          <string>Настройки подключения</string>
+          <string>Предельный суммарный вес вложений в одном письме, мб:   </string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="1" colspan="2">
+        <widget class="QPlainTextEdit" name="plainTextEdit_body">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Expanding" vsizetype="Minimum">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="maximumSize">
+          <size>
+           <width>16777215</width>
+           <height>80</height>
+          </size>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="1" colspan="2">
+        <widget class="QLineEdit" name="lineEdit_recipients">
+         <property name="toolTip">
+          <string>Например: &quot;ivan123@ya.ru;stas@mail.ru;sud@sudf.ru&quot;</string>
+         </property>
+         <property name="placeholderText">
+          <string>ivan123@ya.ru;stas@mail.ru;sud@sudf.ru</string>
+         </property>
+        </widget>
+       </item>
+       <item row="7" column="1" colspan="2">
+        <widget class="QPushButton" name="pushButton_configure_smtp">
+         <property name="text">
+          <string>Настроить подключение к SMTP</string>
+         </property>
+        </widget>
+       </item>
+       <item row="7" column="0">
+        <widget class="QCheckBox" name="checkBox_use_outlook">
+         <property name="text">
+          <string>Отправлять через Outlook</string>
          </property>
         </widget>
        </item>

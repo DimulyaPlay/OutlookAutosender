@@ -13,7 +13,9 @@ from PyQt5.QtCore import QTimer, QDateTime, QTime, Qt, QThread, pyqtSignal
 from datetime import datetime, timedelta
 import time
 from queue import Queue
-from main_functions import save_config, message_queue, config_file, get_cert_names, gather_mail, send_mail, validate_email, check_time, add_to_startup, config_path, config, is_file_locked, send_mail_smtp
+from main_functions import (save_config, message_queue, config_file, get_cert_names, gather_mail, send_mail,
+                            validate_email, check_time, add_to_startup, config_path, config, is_file_locked,
+                            send_mail_smtp, SMTPConfigDialog)
 import pythoncom
 import win32com.client
 
@@ -74,14 +76,16 @@ class MainWindow(QMainWindow):
         toolButton_lineEdit_get_path.clicked.connect(lambda: self.set_user_dir('lineEdit_get_path'))
         toolButton_lineEdit_put_path = self.findChild(QToolButton, 'toolButton_lineEdit_put_path')
         toolButton_lineEdit_put_path.clicked.connect(lambda: self.set_user_dir('lineEdit_put_path'))
-        toolButton_lineEdit_put_path = self.findChild(QToolButton, 'toolButton_lineEdit_csp_path')
-        toolButton_lineEdit_put_path.clicked.connect(lambda: self.set_user_dir('lineEdit_csp_path'))
         self.comboBox_certs = self.findChild(QComboBox, 'comboBox_certs')
         cert_names = get_cert_names(os.path.join(self.config['lineEdit_csp_path'], 'certmgr.exe'))
         self.comboBox_certs.addItems(cert_names)
         if config['comboBox_certs'] in cert_names:
             self.comboBox_certs.setCurrentText(config['comboBox_certs'])
         self.comboBox_certs.currentTextChanged.connect(self.save_params)
+        self.checkBox_use_outlook = self.findChild(QCheckBox, 'checkBox_use_outlook')
+        self.checkBox_use_outlook.clicked.connect(self.save_params)
+        self.pushButton_configure_smtp = self.findChild(QPushButton, 'pushButton_configure_smtp')
+        self.pushButton_configure_smtp.clicked.connect(self.configure_smtp)
         self.plainTextEdit_body = self.findChild(QPlainTextEdit, 'plainTextEdit_body')
         self.plainTextEdit_body.setPlainText(config['plainTextEdit_body'])
         self.plainTextEdit_body.textChanged.connect(self.save_params)
@@ -185,6 +189,10 @@ class MainWindow(QMainWindow):
         self.daemon_running = False
         self.add_log_message('Работа по расписанию остановлена.')
 
+    def configure_smtp(self):
+        dialog = SMTPConfigDialog(self)
+        dialog.exec_()
+
     def logTimerTriggered(self, timer_index, next_time, periodic=False):
         if periodic:
             next_run = QTime.currentTime().addSecs(next_time)
@@ -235,6 +243,7 @@ class MainWindow(QMainWindow):
         self.config['timeEdit_connecting_delay'] = self.timeEdit_connecting_delay.time().toString('mm:ss')
         self.config['checkBox_periodic'] = self.checkBox_periodic.isChecked()
         self.config['checkBox_schedule'] = self.checkBox_schedule.isChecked()
+        self.config['checkBox_use_outlook'] = self.checkBox_use_outlook.isChecked()
         save_config(config_file, self.config)
 
     def send_mail(self, manual=False):
@@ -247,10 +256,10 @@ class MainWindow(QMainWindow):
             self.add_log_message(f'Файлы для отправки не найдены')
         for message_attachments, filenames in zip(messages, names):
             try:
-                if self.config['use_smtp']:
-                    result, error = send_mail_smtp(message_attachments)
-                else:
+                if self.config['checkBox_use_outlook']:
                     result, error = send_mail(message_attachments, manual=manual)
+                else:
+                    result, error = send_mail_smtp(message_attachments)
                 if result:
                     sent_files = ', '.join([os.path.basename(fp) for fp in message_attachments])
                     self.add_log_message(f'Отправлены файлы: {sent_files}')
@@ -315,3 +324,4 @@ class QueueMonitorThread(QThread):
             if message is None:
                 break
             self.message_signal.emit(message)
+

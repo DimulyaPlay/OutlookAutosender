@@ -15,7 +15,8 @@ import ctypes
 import winshell
 import sys
 from datetime import datetime
-from PyQt5.QtWidgets import QDialog, QLineEdit, QCheckBox, QWidget, QComboBox, QFormLayout, QVBoxLayout, QDialogButtonBox, QMessageBox, QTableWidgetItem
+from PyQt5.QtWidgets import (QDialog, QLineEdit, QCheckBox, QWidget, QComboBox, QFormLayout, QVBoxLayout,
+                             QDialogButtonBox, QMessageBox, QTableWidgetItem, QLabel, QPushButton)
 from PyQt5 import uic
 from PyQt5.QtGui import QIcon
 import winreg
@@ -35,7 +36,9 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.base import MIMEBase
 from email import encoders
-
+import base64
+from cryptography.fernet import Fernet
+import hashlib
 urllib3.disable_warnings()
 
 
@@ -78,11 +81,61 @@ def load_or_create_default_config(config_file):
         'checkBox_autorun': False,
         'checkBox_autostart': False,
         'timeEdit_connecting_delay': '0:00:30',
-        'use_smtp': False
+        'checkBox_use_outlook': False
     }
     if not os.path.exists(config_file):
         save_config(config_file, default_configuration)
     return default_configuration
+
+
+def get_system_key():
+    """Функция для получения уникального ключа на основе системных данных"""
+    system_info = os.environ.get('COMPUTERNAME', '') + os.environ.get('USERPROFILE', '')
+    key = hashlib.sha256(system_info.encode()).digest()
+    return base64.urlsafe_b64encode(key)
+
+
+def encrypt_data(data, key):
+    """Шифруем данные"""
+    fernet = Fernet(key)
+    return fernet.encrypt(data)  # Убираем .encode(), так как data уже байты
+
+
+def decrypt_data(data, key):
+    """Расшифровываем данные"""
+    fernet = Fernet(key)
+    return fernet.decrypt(data)
+
+
+def save_credentials(server, port, login, password, use_ssl):
+    """Сохраняем зашифрованные учетные данные в файл"""
+    encrypted_server = encrypt_data(server.encode(), get_system_key())
+    encrypted_port = encrypt_data(port.encode(), get_system_key())
+    encrypted_login = encrypt_data(login.encode(), get_system_key())
+    encrypted_password = encrypt_data(password.encode(), get_system_key())
+    encrypted_use_ssl = encrypt_data(use_ssl.encode(), get_system_key())
+    with open('smtp_credentials.txt', 'wb') as f:
+        f.write(encrypted_server + b'\n' +
+                encrypted_port + b'\n' +
+                encrypted_login + b'\n' +
+                encrypted_password + b'\n' +
+                encrypted_use_ssl)
+
+
+def load_credentials():
+    """Загружаем учетные данные из файла и расшифровываем их"""
+    with open('smtp_credentials.txt', 'rb') as f:
+        encrypted_server = f.readline().strip()
+        encrypted_port = f.readline().strip()
+        encrypted_login = f.readline().strip()
+        encrypted_password = f.readline().strip()
+        encrypted_use_ssl = f.readline().strip()
+    server = decrypt_data(encrypted_server, get_system_key()).decode()
+    port = decrypt_data(encrypted_port, get_system_key()).decode()
+    login = decrypt_data(encrypted_login, get_system_key()).decode()
+    password = decrypt_data(encrypted_password, get_system_key()).decode()
+    use_ssl = decrypt_data(encrypted_use_ssl, get_system_key()).decode()
+    return server, port, login, password, use_ssl
 
 
 def read_create_config(config_file):
@@ -313,20 +366,6 @@ def create_shortcut(shortcut_path):
     shortcut.save()
 
 
-def read_smtp_config(config_path='smtp_credentials.txt'):
-    """Читает параметры SMTP из файла."""
-    config = {}
-    if not os.path.exists(config_path):
-        raise FileNotFoundError(f"Файл конфигурации {config_path} не найден.")
-
-    with open(config_path, 'r', encoding='utf-8') as f:
-        for line in f:
-            key, value = line.strip().split('=', 1)
-            config[key.strip()] = value.strip()
-
-    return config
-
-
 def send_mail_smtp(attachments):
     """Отправляет письмо с вложениями через SMTP.
 
@@ -334,12 +373,8 @@ def send_mail_smtp(attachments):
         tuple: (success: bool, message: str)
     """
     try:
-        smtp_config = read_smtp_config()
-        sender_email = smtp_config['login']
-        password = smtp_config['password']
-        smtp_server = smtp_config['server']
-        smtp_port = int(smtp_config.get('port', 465))
-        use_ssl = smtp_config.get('use_ssl', 'false').lower() == 'true'
+        smtp_server, smtp_port, sender_email, password, use_ssl = load_credentials()
+        print(smtp_server, smtp_port, sender_email, password, use_ssl)
         recipients = config['lineEdit_recipients'].split(";")
         if not recipients:
             return False, 'Получатели не обнаружены'
@@ -364,17 +399,17 @@ def send_mail_smtp(attachments):
             body_text += "\n\nСписок направляемых документов:\n" + "\n".join(attachments_list)
         msg.attach(MIMEText(body_text, 'plain'))
         timeout = 5
-        if use_ssl:
+        if use_ssl == 'True':
             context = ssl.create_default_context()
             try:
-                with smtplib.SMTP_SSL(smtp_server, smtp_port, context=context, timeout=timeout) as server:
+                with smtplib.SMTP_SSL(smtp_server, int(smtp_port), context=context, timeout=timeout) as server:
                     server.login(sender_email, password)
                     server.sendmail(sender_email, recipients, msg.as_string())
             except ssl.SSLError as e:
                 return False, f'SSL ошибка: {str(e)}'
         else:
             try:
-                with smtplib.SMTP(smtp_server, smtp_port, timeout=timeout) as server:
+                with smtplib.SMTP(smtp_server, int(smtp_port), timeout=timeout) as server:
                     server.starttls()
                     server.login(sender_email, password)
                     server.sendmail(sender_email, recipients, msg.as_string())
@@ -384,3 +419,101 @@ def send_mail_smtp(attachments):
         return True, "Отправлено успешно"
     except Exception as e:
         return False, f'{str(e)}'
+
+
+class SMTPConfigDialog(QDialog):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.credentials_path = 'smtp_credentials.txt'
+        self.setWindowTitle("Настройки подключения к SMTP")
+
+        layout = QVBoxLayout()
+
+        self.server_label = QLabel("Сервер:")
+        self.server_input = QLineEdit()
+        self.server_input.setPlaceholderText('smtp.yandex.ru')
+        layout.addWidget(self.server_label)
+        layout.addWidget(self.server_input)
+
+        self.port_label = QLabel("Порт:")
+        self.port_input = QLineEdit()
+        self.port_input.setPlaceholderText('465')
+        self.port_input.setText('465')
+        layout.addWidget(self.port_label)
+        layout.addWidget(self.port_input)
+
+        self.login_label = QLabel("Логин:")
+        self.login_input = QLineEdit()
+        layout.addWidget(self.login_label)
+        layout.addWidget(self.login_input)
+
+        self.password_label = QLabel("Пароль:")
+        self.password_input = QLineEdit()
+        self.password_input.setEchoMode(QLineEdit.Password)
+        layout.addWidget(self.password_label)
+        layout.addWidget(self.password_input)
+
+        self.use_ssl = QCheckBox('Использовать SSL')
+        layout.addWidget(self.use_ssl)
+
+        self.test_save_button = QPushButton("Проверить и сохранить")
+        self.test_save_button.clicked.connect(self.test_and_save_connection)
+        layout.addWidget(self.test_save_button)
+
+        self.setLayout(layout)
+
+    def test_and_save_connection(self):
+        """Проверяет подключение к SMTP и сохраняет учетные данные"""
+        credentials = {
+            "server": self.server_input.text(),
+            "port": self.port_input.text(),
+            "login": self.login_input.text(),
+            "password": self.password_input.text(),
+            "use_ssl": str(self.use_ssl.isChecked())
+        }
+        if not all(credentials.values()):
+            QMessageBox.critical(self, "Ошибка", "Все поля должны быть заполнены!")
+            return
+        try:
+            sender_email = credentials["login"]
+            recipients = [sender_email]
+            msg = MIMEMultipart()
+            msg['From'] = sender_email
+            msg['To'] = sender_email
+            msg['Subject'] = "Тестовое письмо"
+            msg.attach(MIMEText("Это тестовое письмо для проверки подключения к SMTP OutlookAutosender.", 'plain'))
+            timeout = 5
+            if credentials["use_ssl"] == "True":
+                context = ssl.create_default_context()
+                with smtplib.SMTP_SSL(
+                        credentials["server"],
+                        int(credentials["port"]),
+                        context=context,
+                        timeout=timeout
+                ) as server:
+                    server.login(sender_email, credentials["password"])
+                    server.sendmail(sender_email, recipients, msg.as_string())
+            else:
+                with smtplib.SMTP(
+                        credentials["server"],
+                        int(credentials["port"]),
+                        timeout=timeout
+                ) as server:
+                    server.starttls()
+                    server.login(sender_email, credentials["password"])
+                    server.sendmail(sender_email, recipients, msg.as_string())
+            save_credentials(
+                credentials["server"],
+                credentials["port"],
+                credentials["login"],
+                credentials["password"],
+                credentials["use_ssl"]
+            )
+            QMessageBox.information(self, "Успех", "Подключение успешно! Настройки сохранены.")
+            self.accept()
+        except Exception as e:
+            QMessageBox.critical(
+                self,
+                "Ошибка подключения",
+                f"Не удалось подключиться к SMTP серверу:\n{str(e)}"
+            )
