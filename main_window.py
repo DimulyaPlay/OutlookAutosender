@@ -259,6 +259,7 @@ class MainWindow(QMainWindow):
                 if self.config['checkBox_use_outlook']:
                     result, error = send_mail(message_attachments, manual=manual)
                 else:
+                    self.add_log_message('Отправка на SMTP сервер, окно программы зависнет на время отправки.')
                     result, error = send_mail_smtp(message_attachments)
                 if result:
                     sent_files = ', '.join([os.path.basename(fp) for fp in message_attachments])
@@ -266,8 +267,10 @@ class MainWindow(QMainWindow):
                     if self.config['checkBox_archive_files']:
                         sent_file_names = ',\n'.join([os.path.basename(fp) for fp in filenames])
                         self.add_log_message(f'В архиве {sent_files} содержатся:\n{sent_file_names}')
+                    self.tray.showMessage("Успех", "Документы были успешно отправлены", QSystemTrayIcon.Information)
                 else:
                     self.add_log_message(f'Ошибка: {error}')
+                    self.tray.showMessage("Ошибка", f"Ошибка при отправке:{error}", QSystemTrayIcon.Information)
             except Exception as e:
                 exc_type, exc_value, exc_traceback = sys.exc_info()
                 traceback_str = ''.join(traceback.format_exception(exc_type, exc_value, exc_traceback))
