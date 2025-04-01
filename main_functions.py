@@ -49,10 +49,7 @@ def save_config(config_file, config):
     except:
         print_exc()
 
-config_path = os.path.dirname(sys.argv[0])
-if not os.path.exists(config_path):
-    os.mkdir(config_path)
-config_file = os.path.join(config_path, 'config.json')
+config_file = os.path.join(os.getcwd(), 'config.json')
 message_queue = Queue()
 temp_path = os.path.join(os.getcwd(), 'temp')
 shutil.rmtree(temp_path, True)
@@ -81,7 +78,7 @@ def load_or_create_default_config(config_file):
         'checkBox_autorun': False,
         'checkBox_autostart': False,
         'timeEdit_connecting_delay': '0:00:30',
-        'checkBox_use_outlook': False
+        'checkBox_use_outlook': True
     }
     if not os.path.exists(config_file):
         save_config(config_file, default_configuration)
@@ -374,7 +371,6 @@ def send_mail_smtp(attachments):
     """
     try:
         smtp_server, smtp_port, sender_email, password, use_ssl = load_credentials()
-        print(smtp_server, smtp_port, sender_email, password, use_ssl)
         recipients = config['lineEdit_recipients'].split(";")
         if not recipients:
             return False, 'Получатели не обнаружены'

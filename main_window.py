@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 import time
 from queue import Queue
 from main_functions import (save_config, message_queue, config_file, get_cert_names, gather_mail, send_mail,
-                            validate_email, check_time, add_to_startup, config_path, config, is_file_locked,
+                            validate_email, check_time, add_to_startup, config, is_file_locked,
                             send_mail_smtp, SMTPConfigDialog)
 import pythoncom
 import win32com.client
