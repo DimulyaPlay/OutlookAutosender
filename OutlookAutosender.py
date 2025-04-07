@@ -15,18 +15,9 @@ if hasattr(QtCore.Qt, 'AA_EnableHighDpiScaling'):
 if hasattr(QtCore.Qt, 'AA_UseHighDpiPixmaps'):
     QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps, True)
 
-def exception_hook(exc_type, exc_value, exc_traceback):
-    """
-    Функция для перехвата исключений и отображения диалогового окна с ошибкой.
-    """
-    error_msg = ''.join(traceback.format_exception(exc_type, exc_value, exc_traceback))
-    error_dialog = QtWidgets.QErrorMessage()
-    error_dialog.showMessage(error_msg)
-    error_dialog.exec_()
-    sys.__excepthook__(exc_type, exc_value, exc_traceback)
-
-
-sys.excepthook = exception_hook
+if getattr(sys, 'frozen', False):
+    sys.stdout = open('console_output.log', 'a', buffering=1)
+    sys.stderr = open('console_errors.log', 'a', buffering=1)
 
 
 if __name__ == '__main__':

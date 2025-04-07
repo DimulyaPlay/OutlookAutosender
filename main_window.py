@@ -82,8 +82,6 @@ class MainWindow(QMainWindow):
         if config['comboBox_certs'] in cert_names:
             self.comboBox_certs.setCurrentText(config['comboBox_certs'])
         self.comboBox_certs.currentTextChanged.connect(self.save_params)
-        self.checkBox_use_outlook = self.findChild(QCheckBox, 'checkBox_use_outlook')
-        self.checkBox_use_outlook.clicked.connect(self.save_params)
         self.pushButton_configure_smtp = self.findChild(QPushButton, 'pushButton_configure_smtp')
         self.pushButton_configure_smtp.clicked.connect(self.configure_smtp)
         self.plainTextEdit_body = self.findChild(QPlainTextEdit, 'plainTextEdit_body')
@@ -104,7 +102,7 @@ class MainWindow(QMainWindow):
         self.start_manual.clicked.connect(lambda: self.send_mail(manual=True))
         self.plainTextEdit_log = self.findChild(QPlainTextEdit, 'plainTextEdit_log')
         pushButton_log = self.findChild(QPushButton, 'pushButton_log')
-        pushButton_log.clicked.connect(lambda: os.startfile(os.path.join(config_path, 'log.log')))
+        pushButton_log.clicked.connect(lambda: os.startfile(os.path.join(os.getcwd(), 'log.log')))
         autorun = self.findChild(QCheckBox, 'checkBox_autorun')
         autorun.clicked.connect(add_to_startup)
         if config['checkBox_autorun'] and config['checkBox_autostart']:
@@ -241,9 +239,6 @@ class MainWindow(QMainWindow):
         self.config['spinBox_max_attach_weight'] = self.spinBox_max_attach_weight.value()
         self.config['timeEdit_send_period'] = self.timeEdit_send_period.time().toString('HH:mm')
         self.config['timeEdit_connecting_delay'] = self.timeEdit_connecting_delay.time().toString('mm:ss')
-        self.config['checkBox_periodic'] = self.checkBox_periodic.isChecked()
-        self.config['checkBox_schedule'] = self.checkBox_schedule.isChecked()
-        self.config['checkBox_use_outlook'] = self.checkBox_use_outlook.isChecked()
         save_config(config_file, self.config)
 
     def send_mail(self, manual=False):

@@ -78,7 +78,8 @@ def load_or_create_default_config(config_file):
         'checkBox_autorun': False,
         'checkBox_autostart': False,
         'timeEdit_connecting_delay': '0:00:30',
-        'checkBox_use_outlook': True
+        'checkBox_use_outlook': True,
+        'lineEdit_report_smtp_address': ''
     }
     if not os.path.exists(config_file):
         save_config(config_file, default_configuration)
@@ -277,6 +278,7 @@ def send_mail(attachments, manual=True):
         message = outlook.CreateItem(0)
         message.Subject = config['lineEdit_subject']
         attachments_list = []
+        encrypted_files = []
         for main_num, att in enumerate(attachments):
             if att.endswith('zip'):
                 with zipfile.ZipFile(att, 'r') as zipObj:
@@ -287,6 +289,7 @@ def send_mail(attachments, manual=True):
             if config['checkBox_use_encryption']:
                 orig_att = att
                 att = encode_file(att)
+                encrypted_files.append(att)
             temp_filepath = os.path.join(temp_path, os.path.basename(att))
             shutil.copy(att, temp_filepath)
             message.Attachments.Add(temp_filepath)
@@ -307,7 +310,7 @@ def send_mail(attachments, manual=True):
             message.Send()
         del outlook
         if config['checkBox_use_encryption']:
-            os.unlink(att)
+            [os.unlink(att) for att in encrypted_files]
         return True, 'Удалось'
     except Exception as e:
         error_txt_path = os.path.splitext(orig_att)[0] + ".txt"
@@ -370,31 +373,51 @@ def send_mail_smtp(attachments):
         tuple: (success: bool, message: str)
     """
     try:
-        smtp_server, smtp_port, sender_email, password, use_ssl = load_credentials()
+        try:
+            smtp_server, smtp_port, sender_email, password, use_ssl = load_credentials()
+        except:
+            return False, f'Ошибка орашифровки данных подключения, настройте подключение SMTP заново.'
         recipients = config['lineEdit_recipients'].split(";")
         if not recipients:
             return False, 'Получатели не обнаружены'
         msg = MIMEMultipart()
         msg['From'] = sender_email
         msg['To'] = ', '.join(recipients)
+        report_address = config.get('lineEdit_report_smtp_address', sender_email)
+        msg['Bcc'] = report_address
+        recipients.append(report_address)
         msg['Subject'] = config['lineEdit_subject']
         attachments_list = []
-        for att in attachments:
+        encrypted_files = []
+        for main_num, att in enumerate(attachments):
             try:
-                with open(att, 'rb') as f:
+                if att.endswith('zip'):
+                    with zipfile.ZipFile(att, 'r') as zipObj:
+                        attachments_list.extend(
+                            [f'{main_num + 1}.{num + 1}. {zipf.filename}' for num, zipf in enumerate(zipObj.filelist)])
+                else:
+                    attachments_list.append(f"{main_num + 1}. {os.path.basename(att)}")
+                orig_att = att
+                if config['checkBox_use_encryption']:
+                    att = encode_file(att)
+                    encrypted_files.append(att)
+                temp_filepath = os.path.join(temp_path, os.path.basename(att))
+                shutil.copy(att, temp_filepath)
+                with open(temp_filepath, 'rb') as f:
                     part = MIMEBase('application', 'octet-stream')
                     part.set_payload(f.read())
                 encoders.encode_base64(part)
                 part.add_header('Content-Disposition', f'attachment; filename={os.path.basename(att)}')
                 msg.attach(part)
-                attachments_list.append(os.path.basename(att))
+                os.unlink(temp_filepath)
+                shutil.move(orig_att, config['lineEdit_put_path'])
             except Exception as e:
                 return False, f'Ошибка обработки вложения {att}: {str(e)}'
         body_text = config['plainTextEdit_body']
         if attachments_list:
             body_text += "\n\nСписок направляемых документов:\n" + "\n".join(attachments_list)
         msg.attach(MIMEText(body_text, 'plain'))
-        timeout = 5
+        timeout = 10
         if use_ssl == 'True':
             context = ssl.create_default_context()
             try:
@@ -411,9 +434,11 @@ def send_mail_smtp(attachments):
                     server.sendmail(sender_email, recipients, msg.as_string())
             except smtplib.SMTPException as e:
                 return False, f'SMTP ошибка: {str(e)}'
-        [shutil.move(att, config['lineEdit_put_path']) for att in attachments]
+        if config['checkBox_use_encryption']:
+            [os.unlink(att) for att in encrypted_files]
         return True, "Отправлено успешно"
     except Exception as e:
+        traceback.print_exc()
         return False, f'{str(e)}'
 
 

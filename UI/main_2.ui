@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>443</width>
-    <height>765</height>
+    <width>431</width>
+    <height>779</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -70,16 +70,6 @@
          </property>
         </widget>
        </item>
-       <item row="4" column="0" colspan="3">
-        <widget class="QCheckBox" name="checkBox_use_encryption">
-         <property name="text">
-          <string>Шифровать файлы сертификатом</string>
-         </property>
-         <property name="checked">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
        <item row="0" column="0">
         <widget class="QLabel" name="label_2">
          <property name="toolTip">
@@ -90,54 +80,20 @@
          </property>
         </widget>
        </item>
-       <item row="2" column="0">
-        <widget class="QLabel" name="label_4">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Preferred" vsizetype="Minimum">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
+       <item row="4" column="0" colspan="3">
+        <widget class="QCheckBox" name="checkBox_use_encryption">
          <property name="text">
-          <string>Тело письма:</string>
+          <string>Шифровать файлы сертификатом</string>
          </property>
-         <property name="alignment">
-          <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
-         </property>
-        </widget>
-       </item>
-       <item row="5" column="0">
-        <widget class="QLabel" name="label">
-         <property name="toolTip">
-          <string>Укажите папку, где находится файл csptest.exe 
-(Место установки КРИПТО ПРО, по умолчанию C:\Program Files\Crypto Pro\CSP)</string>
-         </property>
-         <property name="text">
-          <string>Папка с csptest.exe:</string>
-         </property>
-        </widget>
-       </item>
-       <item row="5" column="1" colspan="2">
-        <widget class="QLineEdit" name="lineEdit_csp_path">
-         <property name="maximumSize">
-          <size>
-           <width>282</width>
-           <height>16777215</height>
-          </size>
-         </property>
-         <property name="toolTip">
-          <string>Укажите папку, где находится файл csptest.exe 
-(Место установки КРИПТО ПРО, по умолчанию C:\Program Files\Crypto Pro\CSP)</string>
-         </property>
-         <property name="placeholderText">
-          <string>C:\Program Files\Crypto Pro\CSP</string>
+         <property name="checked">
+          <bool>true</bool>
          </property>
         </widget>
        </item>
        <item row="1" column="0">
         <widget class="QLabel" name="label_3">
          <property name="text">
-          <string>Тема письма:</string>
+          <string>Тема отправляемых писем:</string>
          </property>
         </widget>
        </item>
@@ -165,8 +121,49 @@
          </item>
         </widget>
        </item>
-       <item row="1" column="1" colspan="2">
-        <widget class="QLineEdit" name="lineEdit_subject"/>
+       <item row="2" column="0">
+        <widget class="QLabel" name="label_4">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Preferred" vsizetype="Minimum">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="text">
+          <string>Тело отправляемых писем:</string>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="1" colspan="2">
+        <widget class="QLineEdit" name="lineEdit_csp_path">
+         <property name="maximumSize">
+          <size>
+           <width>282</width>
+           <height>16777215</height>
+          </size>
+         </property>
+         <property name="toolTip">
+          <string>Укажите папку, где находится файл csptest.exe 
+(Место установки КРИПТО ПРО, по умолчанию C:\Program Files\Crypto Pro\CSP)</string>
+         </property>
+         <property name="placeholderText">
+          <string>C:\Program Files\Crypto Pro\CSP</string>
+         </property>
+        </widget>
+       </item>
+       <item row="5" column="0">
+        <widget class="QLabel" name="label">
+         <property name="toolTip">
+          <string>Укажите папку, где находится файл csptest.exe 
+(Место установки КРИПТО ПРО, по умолчанию C:\Program Files\Crypto Pro\CSP)</string>
+         </property>
+         <property name="text">
+          <string>Папка с csptest.exe:</string>
+         </property>
+        </widget>
        </item>
        <item row="3" column="0" colspan="2">
         <widget class="QLabel" name="label_8">
@@ -205,6 +202,16 @@
          </property>
         </widget>
        </item>
+       <item row="1" column="1" colspan="2">
+        <widget class="QLineEdit" name="lineEdit_subject"/>
+       </item>
+       <item row="7" column="0">
+        <widget class="QCheckBox" name="checkBox_use_outlook">
+         <property name="text">
+          <string>Отправлять через Outlook</string>
+         </property>
+        </widget>
+       </item>
        <item row="7" column="1" colspan="2">
         <widget class="QPushButton" name="pushButton_configure_smtp">
          <property name="text">
@@ -212,10 +219,17 @@
          </property>
         </widget>
        </item>
-       <item row="7" column="0">
-        <widget class="QCheckBox" name="checkBox_use_outlook">
+       <item row="8" column="1" colspan="2">
+        <widget class="QLineEdit" name="lineEdit_report_smtp_address">
+         <property name="placeholderText">
+          <string>Оставьте пустым для отправки на свой адрес</string>
+         </property>
+        </widget>
+       </item>
+       <item row="8" column="0">
+        <widget class="QLabel" name="label_11">
          <property name="text">
-          <string>Отправлять через Outlook</string>
+          <string>Адрес для отпр. отчета SMTP: </string>
          </property>
         </widget>
        </item>
