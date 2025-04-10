@@ -18,17 +18,13 @@ from main_functions import (save_config, message_queue, config_file, get_cert_na
                             send_mail_smtp, SMTPConfigDialog)
 import pythoncom
 import win32com.client
+import schedule
 
 
 class MainWindow(QMainWindow):
     def __init__(self, config):
         super().__init__()
-        self.monitor_inbox_thread = None
-        self.download_queue = Queue()
-        self.connection_window = None
-        self.edo_window = None
-        self.observer = None
-        self.soed_available = False
+        self.schedule = schedule.Scheduler()
         ui_file = 'UI/main_2.ui'
         uic.loadUi(ui_file, self)
         icon = QIcon("UI/icons8-carrier-pigeon-64.png")
@@ -102,7 +98,7 @@ class MainWindow(QMainWindow):
         self.start_manual.clicked.connect(lambda: self.send_mail(manual=True))
         self.plainTextEdit_log = self.findChild(QPlainTextEdit, 'plainTextEdit_log')
         pushButton_log = self.findChild(QPushButton, 'pushButton_log')
-        pushButton_log.clicked.connect(lambda: os.startfile(os.path.join(os.getcwd(), 'log.log')))
+        pushButton_log.clicked.connect(lambda: os.startfile(os.path.join(os.getcwd(), 'console_output.log')))
         autorun = self.findChild(QCheckBox, 'checkBox_autorun')
         autorun.clicked.connect(add_to_startup)
         if config['checkBox_autorun'] and config['checkBox_autostart']:
@@ -122,9 +118,9 @@ class MainWindow(QMainWindow):
             self.start_scheduler.setText('Запустить работу по расписанию')
             self.running = False
         else:
-            if not self.daemon_running:  # Исключаем повторные запуски
+            if not self.daemon_running:
                 res = self.startScheduler()
-                if res == 0:  # Успешный запуск
+                if res == 0:
                     self.start_scheduler.setText('Остановить работу по расписанию')
                     self.running = True
                 else:
@@ -134,62 +130,58 @@ class MainWindow(QMainWindow):
         errors = self.check_fields(False)
         if errors:
             self.add_log_message('\n'.join(errors))
-            return -1  # Ошибка валидации
+            return -1
         try:
-            self.daemon_running = True  # Флаг активности
-            self.schedule_timers.clear()  # Очищаем старые таймеры
-            self.timer_index = 1  # Устанавливаем счетчик таймеров
-            # Периодический таймер
+            self.daemon_running = True
+            self.schedule.clear()  # очищаем старое расписание
+            self.timer_index = 1
+            # Периодический режим
             if self.config['checkBox_periodic']:
                 period = self.timeEdit_send_period.time().hour() * 3600 + self.timeEdit_send_period.time().minute() * 60
                 if period <= 0:
                     self.add_log_message('Некорректный период отправки.')
                     return -1
-                timer_id = self.timer_index  # Сохраняем номер таймера
-                self.timer.setInterval(period * 1000)  # Интервал в миллисекундах
-                self.timer.timeout.connect(lambda tid=timer_id, p=period: self.logTimerTriggered(tid, p, periodic=True))
-                self.timer.start()
-                self.add_log_message(f'Запущен периодический таймер №{timer_id}: каждые {period} секунд.')
+                schedule.every(period).seconds.do(
+                    lambda: self.logTimerTriggered(self.timer_index, period, periodic=True))
+                self.add_log_message(f'Запущен периодический таймер №{self.timer_index}: каждые {period} секунд.')
                 self.timer_index += 1
-            # Таймеры по расписанию
+            # По расписанию
             if self.config['checkBox_schedule']:
-                now = QTime.currentTime()
                 schedule_times = self.config['lineEdit_schedule'].split(',')
                 for time_str in schedule_times:
-                    time = QTime.fromString(time_str.strip(), "HH:mm")
+                    time_str = time_str.strip()
+                    time = QTime.fromString(time_str, "HH:mm")
                     if not time.isValid():
                         self.add_log_message(f'Ошибка формата времени: {time_str}')
                         continue
-                    delay_ms = now.msecsTo(time)
-                    if delay_ms < 0:
-                        delay_ms += 86400000  # Запуск на следующий день
-                    timer_id = self.timer_index  # Сохраняем номер таймера
-                    timer = QTimer(self)
-                    timer.setSingleShot(True)
-                    timer.timeout.connect(lambda tid=timer_id, t=time: self.logTimerTriggered(tid, t))
-                    QTimer.singleShot(delay_ms, lambda t=timer: t.start())  # Избегаем удаления объекта
-                    self.schedule_timers.append(timer)
-                    self.add_log_message(
-                        f'Запущен таймер №{timer_id} на {time.toString("HH:mm")}, через {delay_ms / 1000:.0f} секунд.')
+                    schedule.every().day.at(time_str).do(
+                        lambda tid=self.timer_index, t=time: self.logTimerTriggered(tid, t))
+                    self.add_log_message(f'Запланирована задача №{self.timer_index} на {time_str}.')
                     self.timer_index += 1
+            # Таймер для вызова run_pending
+            self.schedule_timer = QTimer(self)
+            self.schedule_timer.timeout.connect(self.run_schedule_pending)
+            self.schedule_timer.start(30000)  # раз в 30 секунд
+
             self.add_log_message('Работа по расписанию запущена.')
-            return 0  # Успешный запуск
+            return 0
 
         except Exception as e:
-            self.add_log_message(f'Ошибка при запуске таймеров: {e}')
+            self.add_log_message(f'Ошибка при запуске планировщика: {e}')
             return -1
 
+    def run_schedule_pending(self):
+        try:
+            schedule.run_pending()
+        except Exception as e:
+            self.add_log_message(f'Ошибка в планировщике: {e}')
+
     def stopScheduler(self):
-        self.timer.stop()
-        for timer in self.schedule_timers:
-            timer.stop()
-        self.schedule_timers.clear()
+        if hasattr(self, 'schedule_timer'):
+            self.schedule_timer.stop()
+        schedule.clear()
         self.daemon_running = False
         self.add_log_message('Работа по расписанию остановлена.')
-
-    def configure_smtp(self):
-        dialog = SMTPConfigDialog(self)
-        dialog.exec_()
 
     def logTimerTriggered(self, timer_index, next_time, periodic=False):
         if periodic:
@@ -197,8 +189,12 @@ class MainWindow(QMainWindow):
             self.add_log_message(
                 f'Сработал периодический таймер №{timer_index}, следующий запуск в {next_run.toString("HH:mm")}')
         else:
-            self.add_log_message(f'Сработал таймер №{timer_index}, следующий запуск в {next_time.toString("HH:mm")}')
+            self.add_log_message(f'Сработал таймер №{timer_index}, задача на {next_time.toString("HH:mm")}')
         self.send_mail()
+
+    def configure_smtp(self):
+        dialog = SMTPConfigDialog(self)
+        dialog.exec_()
 
     def hideEvent(self, event):
         event.ignore()
@@ -277,7 +273,7 @@ class MainWindow(QMainWindow):
         current_datetime = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         log_entry = f"{current_datetime} - {message}"
         self.plainTextEdit_log.appendPlainText(log_entry)
-        log_path = os.path.join(os.path.dirname(sys.argv[0]), 'log.log')
+        log_path = os.path.join(os.getcwd(), 'console_output.log')
         with open(log_path, "a") as log_file:
             log_file.write(log_entry + "\n")
 

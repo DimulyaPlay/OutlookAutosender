@@ -383,7 +383,7 @@ def send_mail_smtp(attachments):
         msg = MIMEMultipart()
         msg['From'] = sender_email
         msg['To'] = ', '.join(recipients)
-        report_address = config.get('lineEdit_report_smtp_address', sender_email)
+        report_address = config['lineEdit_report_smtp_address'] if config['lineEdit_report_smtp_address'] else sender_email
         msg['Bcc'] = report_address
         recipients.append(report_address)
         msg['Subject'] = config['lineEdit_subject']
@@ -412,12 +412,14 @@ def send_mail_smtp(attachments):
                 os.unlink(temp_filepath)
                 shutil.move(orig_att, config['lineEdit_put_path'])
             except Exception as e:
+                if config['checkBox_use_encryption']:
+                    [os.unlink(att) for att in encrypted_files]
                 return False, f'Ошибка обработки вложения {att}: {str(e)}'
         body_text = config['plainTextEdit_body']
         if attachments_list:
             body_text += "\n\nСписок направляемых документов:\n" + "\n".join(attachments_list)
         msg.attach(MIMEText(body_text, 'plain'))
-        timeout = 10
+        timeout = 120
         if use_ssl == 'True':
             context = ssl.create_default_context()
             try:
@@ -425,6 +427,8 @@ def send_mail_smtp(attachments):
                     server.login(sender_email, password)
                     server.sendmail(sender_email, recipients, msg.as_string())
             except ssl.SSLError as e:
+                if config['checkBox_use_encryption']:
+                    [os.unlink(att) for att in encrypted_files]
                 return False, f'SSL ошибка: {str(e)}'
         else:
             try:
@@ -433,6 +437,8 @@ def send_mail_smtp(attachments):
                     server.login(sender_email, password)
                     server.sendmail(sender_email, recipients, msg.as_string())
             except smtplib.SMTPException as e:
+                if config['checkBox_use_encryption']:
+                    [os.unlink(att) for att in encrypted_files]
                 return False, f'SMTP ошибка: {str(e)}'
         if config['checkBox_use_encryption']:
             [os.unlink(att) for att in encrypted_files]

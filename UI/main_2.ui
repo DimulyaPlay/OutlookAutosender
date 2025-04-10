@@ -222,7 +222,7 @@
        <item row="8" column="1" colspan="2">
         <widget class="QLineEdit" name="lineEdit_report_smtp_address">
          <property name="placeholderText">
-          <string>Оставьте пустым для отправки на свой адрес</string>
+          <string>Копия будет отправлена на указанный адрес</string>
          </property>
         </widget>
        </item>
